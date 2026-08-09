@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download fnpack
+        run: npm run download:fnpack
+
+      - name: Pack fpk
+        run: npm run pack:fpk
+
+      - name: Read app meta
+        id: meta
+        run: |
+          echo "title=$(node -p 'require("./template.config.json").appTitle')" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare release notes
+        shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const cfg = JSON.parse(fs.readFileSync("template.config.json", "utf8"));
+            const notes = cfg.releaseNotes || {};
+            const lines = [
+              `# ${cfg.appTitle} ${process.env.VERSION}`,
+              "",
+              "## Summary",
+              "",
+              `- ${notes.summary || cfg.appDescription}`,
+              "",
+              "## Highlights",
+              "",
+              ...(notes.highlights || []).map((h) => `- ${h}`),
+              "",
+              "## Release Artifacts",
+              "",
+              "- `dist/app.tgz`: fnOS app payload archive",
+              "- `dist/*.fpk`: installable fnOS package",
+              "",
+              "## Notes",
+              "",
+              "- Generated from GitHub Actions",
+              "- Version source: `package.json`",
+              "- Release notes source: `template.config.json` 的 releaseNotes 字段"
+            ];
+            fs.writeFileSync("RELEASE_NOTES.md", lines.join("\n") + "\n");
+          '
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          name: ${{ steps.meta.outputs.title }} ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          files: |
+            dist/app.tgz
+            dist/*.fpk

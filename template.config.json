@@ -1,0 +1,30 @@
+{
+  "appName": "fnos-app-schulte",
+  "appTitle": "舒尔特训练",
+  "displayName": "舒尔特训练",
+  "appDescription": "家庭版舒尔特注意力训练游戏，方格与蜂巢混合玩法，1-500 渐进关卡、限时挑战、家庭排行榜。",
+  "desktopLaunchName": "fnos-app-schulte.Application",
+  "gatewayPrefix": "/app/fnos-app-schulte",
+  "gatewaySocket": "app.sock",
+  "uiAllUsers": false,
+  "localDevPort": 3333,
+  "runtimeDependency": "nodejs_v22",
+  "osMinVersion": "1.1.3100",
+  "maintainer": "timor-m",
+  "maintainerUrl": "https://github.com/timor-m/fnos-app-schulte.git",
+  "distributor": "timor-m",
+  "distributorUrl": "https://github.com/timor-m/fnos-app-schulte.git",
+  "source": "thirdparty",
+  "platform": "all",
+  "runAs": "package",
+  "logLevel": "info",
+  "releaseNotes": {
+    "summary": "家庭版舒尔特注意力训练游戏。",
+    "highlights": [
+      "方格与蜂巢混合玩法，1-500 渐进关卡，可从任意关开始",
+      "101 关起限时挑战，通关成绩自动上报",
+      "家庭排行榜与个人训练档案，复用 NAS 登录态",
+      "关卡分享链接直达，护眼清新的响应式界面"
+    ]
+  }
+}
