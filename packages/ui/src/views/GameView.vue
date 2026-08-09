@@ -162,8 +162,22 @@ function stopTimer() {
 }
 
 function vibrate(pattern: number | number[]) {
-  if (settings.haptics && "vibrate" in navigator) {
-    navigator.vibrate(pattern);
+  try {
+    if (settings.haptics && "vibrate" in navigator) {
+      navigator.vibrate(pattern);
+    }
+  } catch {
+    // 触觉反馈失败不影响游戏
+  }
+}
+
+function safeSound(play: () => void) {
+  // 音效必须在状态更新之后调用，且任何异常都不能吞掉这次点按
+  if (!settings.sound) return;
+  try {
+    play();
+  } catch {
+    // 音频上下文不可用时静默降级
   }
 }
 
@@ -171,15 +185,15 @@ function tapCell(value: number, index: number) {
   if (!started.value || paused.value || finished.value || failed.value) return;
 
   if (value === target.value) {
-    if (settings.sound) playTap(target.value);
     target.value += 1;
+    safeSound(() => playTap(target.value - 1));
     if (target.value > total.value) {
       finish();
     }
   } else if (!doneSet.value.has(value)) {
     errors.value += 1;
     wrongIndex.value = index;
-    if (settings.sound) playError();
+    safeSound(playError);
     vibrate(30);
     window.setTimeout(() => {
       if (wrongIndex.value === index) wrongIndex.value = -1;
@@ -191,7 +205,7 @@ function finish() {
   accumulated = elapsed.value;
   stopTimer();
   finished.value = true;
-  if (settings.sound) playComplete();
+  safeSound(playComplete);
   vibrate(60);
 
   const ms = Math.round(elapsed.value);
@@ -217,7 +231,7 @@ function fail() {
   accumulated = elapsed.value;
   stopTimer();
   failed.value = true;
-  if (settings.sound) playFail();
+  safeSound(playFail);
   vibrate([60, 40, 60]);
 }
 

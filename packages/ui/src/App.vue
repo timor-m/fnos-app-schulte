@@ -8,17 +8,8 @@ import ProfileView from "./views/ProfileView.vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
 import { clampLevel, canonicalSeed, parseSeed } from "./game/levels";
 import { loadSettings, saveSettings, type GameSettings, DEFAULT_SETTINGS } from "./game/storage";
+import { fetchSession } from "./game/api";
 import appIcon from "./assets/app-icon.png";
-
-type SessionResponse = {
-  ok: boolean;
-  data: {
-    authenticated: boolean;
-    uid: string | null;
-    username: string | null;
-    isAdmin: boolean;
-  };
-};
 
 type GameTarget = { level: number; seed: number | null };
 type View = "home" | "leaderboard" | "me" | "game";
@@ -89,16 +80,8 @@ onMounted(async () => {
     view.value = "game";
   }
 
-  try {
-    const apiBase = new URL("./api/", window.location.href);
-    const res = await fetch(new URL("session", apiBase));
-    if (res.ok) {
-      const json = (await res.json()) as SessionResponse;
-      username.value = json.data.username;
-    }
-  } catch {
-    // 本地开发未经过网关时忽略
-  }
+  const session = await fetchSession();
+  username.value = session?.username ?? null;
 });
 </script>
 
@@ -123,7 +106,6 @@ onMounted(async () => {
             <CircleUserRound :size="16" /><span>我的</span>
           </button>
         </nav>
-        <span v-if="username" class="user-chip" :title="`fnOS 用户：${username}`">{{ username }}</span>
         <button class="icon-btn" type="button" aria-label="设置" title="设置" @click="settingsOpen = true">
           <Settings :size="20" :stroke-width="1.8" />
         </button>

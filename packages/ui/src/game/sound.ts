@@ -1,30 +1,38 @@
 let audioContext: AudioContext | null = null;
 
 function getContext(): AudioContext | null {
-  if (typeof window === "undefined") return null;
-  const Ctor =
-    window.AudioContext ??
-    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctor) return null;
-  if (!audioContext) audioContext = new Ctor();
-  if (audioContext.state === "suspended") {
-    void audioContext.resume();
+  try {
+    if (typeof window === "undefined") return null;
+    const Ctor =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return null;
+    if (!audioContext) audioContext = new Ctor();
+    if (audioContext.state === "suspended") {
+      void audioContext.resume();
+    }
+    return audioContext;
+  } catch {
+    return null;
   }
-  return audioContext;
 }
 
 function tone(frequency: number, durationMs: number, type: OscillatorType, gainValue: number): void {
-  const ctx = getContext();
-  if (!ctx) return;
-  const oscillator = ctx.createOscillator();
-  const gain = ctx.createGain();
-  oscillator.type = type;
-  oscillator.frequency.value = frequency;
-  gain.gain.setValueAtTime(gainValue, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + durationMs / 1000);
-  oscillator.connect(gain).connect(ctx.destination);
-  oscillator.start();
-  oscillator.stop(ctx.currentTime + durationMs / 1000);
+  try {
+    const ctx = getContext();
+    if (!ctx) return;
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = type;
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(gainValue, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + durationMs / 1000);
+    oscillator.connect(gain).connect(ctx.destination);
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + durationMs / 1000);
+  } catch {
+    // 音频不可用时静默降级，绝不影响点按逻辑
+  }
 }
 
 export function playTap(step: number): void {

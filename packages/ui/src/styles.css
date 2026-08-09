@@ -25,6 +25,8 @@ html,
 body {
   margin: 0;
   min-height: 100vh;
+  /* 只允许平移滚动，禁止双指捏合与双击缩放 */
+  touch-action: pan-x pan-y;
 }
 
 body {
@@ -1421,7 +1423,7 @@ button {
 .board {
   position: relative;
   width: min(92vw, 58vh, 560px);
-  touch-action: manipulation;
+  touch-action: pan-x pan-y;
   user-select: none;
 }
 
@@ -1436,6 +1438,9 @@ button {
 }
 
 .cell {
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  user-select: none;
   border: 1px solid var(--line);
   background: var(--surface);
   font-size: 1em;
@@ -1486,6 +1491,9 @@ button {
 
 .hex-g {
   cursor: pointer;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  user-select: none;
   transform-box: fill-box;
   transform-origin: center;
 }

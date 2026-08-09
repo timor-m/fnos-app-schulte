@@ -1,4 +1,10 @@
-const apiBase = new URL("./api/", window.location.href);
+// 以构建期确定的网关前缀为基准拼接 API 地址：
+// 不能用 "./api/" 相对当前页面 URL 解析——fnOS 桌面入口的 iframe 地址不带尾斜杠时，
+// 相对解析会丢一级路径变成 /app/api/*（404）。
+const appBasePath = import.meta.env.BASE_URL.endsWith("/")
+  ? import.meta.env.BASE_URL
+  : `${import.meta.env.BASE_URL}/`;
+const apiBase = new URL("api/", new URL(appBasePath, window.location.origin));
 
 function apiUrl(path: string): string {
   return new URL(path.replace(/^\//, ""), apiBase).toString();
@@ -60,6 +66,17 @@ export type MeData = {
 
 export function fetchMe(): Promise<MeData | null> {
   return get<MeData>("me");
+}
+
+export type SessionInfo = {
+  authenticated: boolean;
+  uid: string | null;
+  username: string | null;
+  isAdmin: boolean;
+};
+
+export function fetchSession(): Promise<SessionInfo | null> {
+  return get<SessionInfo>("session");
 }
 
 export function fetchMyPlays(cursor: number): Promise<{ plays: PlayItem[]; nextCursor: number | null } | null> {
