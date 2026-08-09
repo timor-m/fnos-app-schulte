@@ -6,7 +6,7 @@
   "desktopLaunchName": "fnos-app-schulte.Application",
   "gatewayPrefix": "/app/fnos-app-schulte",
   "gatewaySocket": "app.sock",
-  "uiAllUsers": false,
+  "uiAllUsers": true,
   "localDevPort": 3333,
   "runtimeDependency": "nodejs_v22",
   "osMinVersion": "1.1.3100",
