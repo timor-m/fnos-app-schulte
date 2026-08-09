@@ -12,6 +12,7 @@
     "dev": "concurrently \"npm:dev:web\" \"npm:dev:server\"",
     "dev:web": "vite --config packages/ui/vite.config.ts",
     "dev:server": "node scripts/dev.mjs",
+    "generate:icons": "node scripts/generate-icons.mjs",
     "build:web": "vite build --config packages/ui/vite.config.ts",
     "build": "npm run build:web && nitro build",
     "start": "node scripts/start.mjs",
