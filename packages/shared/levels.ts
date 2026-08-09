@@ -15,6 +15,9 @@ export const MAX_LEVEL = 500;
 /** 从第 101 关起进入限时挑战 */
 export const TIMED_FROM_LEVEL = 101;
 
+/** 从第 101 关起逐关解锁：必须通关前一关才能进入下一关（1-100 关全部开放） */
+export const SEQUENTIAL_FROM_LEVEL = TIMED_FROM_LEVEL;
+
 export type BoardShape = "grid" | "hex";
 
 export type LevelBand = {
@@ -67,6 +70,20 @@ export function shapeForLevel(level: number): BoardShape {
 export function levelBand(level: number): string {
   const band = LEVEL_BANDS.find((item) => level >= item.from && level <= item.to);
   return (band ?? LEVEL_BANDS[LEVEL_BANDS.length - 1]).name;
+}
+
+/** 关卡是否可进入：101 关起需要已通关前一关 */
+export function isLevelUnlocked(level: number, doneLevels: ReadonlySet<number>): boolean {
+  if (level < SEQUENTIAL_FROM_LEVEL) return true;
+  return doneLevels.has(level - 1);
+}
+
+/** 当前可玩的最前一关：未通关且已解锁的最小关卡号 */
+export function firstPlayableLevel(doneLevels: ReadonlySet<number>): number {
+  for (let level = 1; level <= MAX_LEVEL; level += 1) {
+    if (!doneLevels.has(level) && isLevelUnlocked(level, doneLevels)) return level;
+  }
+  return MAX_LEVEL;
 }
 
 /**

@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { Check, Grid3x3, Hexagon, Play, Timer } from "lucide-vue-next";
+import { Check, Grid3x3, Hexagon, Lock, Play, Timer } from "lucide-vue-next";
 import {
   LEVEL_BANDS,
   MAX_LEVEL,
+  SEQUENTIAL_FROM_LEVEL,
+  firstPlayableLevel,
   gridSizeForLevel,
+  isLevelUnlocked,
   levelBand,
   shapeForLevel,
   shapeName,
@@ -34,7 +37,16 @@ onMounted(() => {
   });
 });
 
-const nextLevel = computed(() => Math.min(progress.value + 1, MAX_LEVEL));
+/** 已通关关卡集合：服务器成绩优先，本机记录兜底 */
+const doneLevels = computed(() => {
+  const set = new Set<number>(serverBests.value.keys());
+  for (let level = 1; level <= MAX_LEVEL; level += 1) {
+    if (bestTime(level) !== null) set.add(level);
+  }
+  return set;
+});
+
+const nextLevel = computed(() => firstPlayableLevel(doneLevels.value));
 
 const levels = computed(() =>
   Array.from({ length: MAX_LEVEL }, (_, i) => {
@@ -48,7 +60,8 @@ const levels = computed(() =>
       shape,
       shapeLabel: shapeName(shape),
       best,
-      done: best !== null
+      done: best !== null,
+      locked: !isLevelUnlocked(level, doneLevels.value)
     };
   })
 );
@@ -100,6 +113,24 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener("scroll", onScroll);
+});
+
+// 点击未解锁关卡的轻提示（disabled 按钮不触发事件，故锁定格保持可点击）
+const lockTip = ref("");
+let lockTipTimer: number | null = null;
+
+function onLevelTap(item: { level: number; locked: boolean }) {
+  if (!item.locked) {
+    emit("start", item.level);
+    return;
+  }
+  lockTip.value = `第 ${item.level} 关还未解锁，先通关第 ${item.level - 1} 关`;
+  if (lockTipTimer !== null) window.clearTimeout(lockTipTimer);
+  lockTipTimer = window.setTimeout(() => (lockTip.value = ""), 2200);
+}
+
+onBeforeUnmount(() => {
+  if (lockTipTimer !== null) window.clearTimeout(lockTipTimer);
 });
 </script>
 
@@ -158,9 +189,11 @@ onBeforeUnmount(() => {
           :key="item.level"
           type="button"
           class="level-cell"
-          :class="{ done: item.done, current: item.level === nextLevel }"
-          :aria-label="`第 ${item.level} 关，${item.shapeLabel} ${item.size}×${item.size}`"
-          @click="emit('start', item.level)"
+          :class="{ done: item.done, current: item.level === nextLevel, locked: item.locked }"
+          :aria-disabled="item.locked || undefined"
+          :title="item.locked ? `通关第 ${item.level - 1} 关后解锁` : undefined"
+          :aria-label="item.locked ? `第 ${item.level} 关，未解锁` : `第 ${item.level} 关，${item.shapeLabel} ${item.size}×${item.size}`"
+          @click="onLevelTap(item)"
         >
           <span class="lc-top">
             <span class="level-num">{{ item.level }}</span>
@@ -168,7 +201,10 @@ onBeforeUnmount(() => {
             <Grid3x3 v-else :size="13" class="lc-shape" />
           </span>
           <span class="lc-bottom">
-            <template v-if="item.done">
+            <template v-if="item.locked">
+              <Lock :size="11" />
+            </template>
+            <template v-else-if="item.done">
               <Check :size="11" class="lc-check" />{{ formatElapsed(item.best!) }}
             </template>
             <template v-else>
@@ -179,6 +215,8 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <p class="home-tip">全部关卡均已解锁，可从任意关开始；同一关的排布与配色默认固定，分享链接可直接挑战同一局面。</p>
+    <p class="home-tip">1-{{ SEQUENTIAL_FROM_LEVEL - 1 }} 关全部开放，{{ SEQUENTIAL_FROM_LEVEL }} 关起需逐关通关解锁；同一关的排布与配色默认固定，分享链接可直接挑战同一局面。</p>
+
+    <div v-if="lockTip" class="toast" role="status"><Lock :size="14" />{{ lockTip }}</div>
   </main>
 </template>

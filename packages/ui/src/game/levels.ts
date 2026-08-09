@@ -10,8 +10,11 @@ import type { BoardShape } from "../../../shared/levels";
 export {
   MAX_LEVEL,
   TIMED_FROM_LEVEL,
+  SEQUENTIAL_FROM_LEVEL,
   LEVEL_BANDS,
   isValidLevel,
+  isLevelUnlocked,
+  firstPlayableLevel,
   gridSizeForLevel,
   cellCountForLevel,
   shapeForLevel,

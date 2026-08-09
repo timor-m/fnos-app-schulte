@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { Grid3x3, Hexagon, Play, TrendingUp } from "lucide-vue-next";
 import { fetchMe, fetchMyPlays, type MeData, type PlayItem } from "../game/api";
-import { MAX_LEVEL, shapeForLevel } from "../game/levels";
+import { firstPlayableLevel, shapeForLevel } from "../game/levels";
 import { formatElapsed } from "../game/format";
 
 const emit = defineEmits<{
@@ -102,7 +102,7 @@ function relativeTime(ts: number): string {
         <button
           type="button"
           class="btn primary me-continue"
-          @click="emit('play', Math.min(me.summary.completed + 1, MAX_LEVEL))"
+          @click="emit('play', firstPlayableLevel(new Set(me.records.map((r) => r.level))))"
         >
           <Play :size="16" fill="currentColor" />继续训练
         </button>

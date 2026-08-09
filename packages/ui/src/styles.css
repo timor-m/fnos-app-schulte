@@ -1206,6 +1206,57 @@ button {
   box-shadow: 0 0 0 2px rgba(47, 158, 110, 0.22);
 }
 
+.level-cell.locked,
+.level-cell.locked:hover {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: var(--line);
+  box-shadow: none;
+  transform: none;
+}
+
+.level-cell.locked .lc-bottom {
+  justify-content: center;
+  color: var(--muted);
+}
+
+/* 轻提示（如点击未解锁关卡） */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(43, 58, 48, 0.92);
+  color: #fff;
+  font-size: 13.5px;
+  box-shadow: var(--shadow);
+  animation: toast-in 0.18s ease;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+
 .lc-top {
   display: flex;
   align-items: center;
@@ -1405,28 +1456,6 @@ button {
 }
 
 /* 点对的格子：轻微弹跳反馈后消隐，不留下已点标记 */
-.cell.done,
-.hex-g.done {
-  pointer-events: none;
-  animation: cell-vanish 0.22s ease forwards;
-}
-
-@keyframes cell-vanish {
-  0% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  35% {
-    transform: scale(1.1);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(0.5);
-    opacity: 0;
-    visibility: hidden;
-  }
-}
-
 .cell.wrong,
 .hex-g.wrong {
   animation: shake 0.3s ease;

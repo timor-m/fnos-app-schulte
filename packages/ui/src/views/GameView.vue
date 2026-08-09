@@ -359,10 +359,10 @@ onBeforeUnmount(() => {
           :key="index"
           type="button"
           class="cell"
-          :class="{ done: doneSet.has(cell.value), wrong: wrongIndex === index }"
+          :class="{ wrong: wrongIndex === index }"
           :style="gridCellStyle(cell)"
-          :disabled="!started || doneSet.has(cell.value) || paused"
-          @click="tapCell(cell.value, index)"
+          :disabled="!started || paused"
+          @pointerdown="tapCell(cell.value, index)"
         >
           {{ cell.value }}
         </button>
@@ -385,10 +385,10 @@ onBeforeUnmount(() => {
             v-for="(cell, index) in spec.cells"
             :key="index"
             class="hex-g"
-            :class="{ done: doneSet.has(cell.value), wrong: wrongIndex === index }"
+            :class="{ wrong: wrongIndex === index }"
             role="button"
             :aria-label="`数字 ${cell.value}`"
-            @click="tapCell(cell.value, index)"
+            @pointerdown="tapCell(cell.value, index)"
           >
             <polygon
               class="hex-poly"

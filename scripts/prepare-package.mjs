@@ -258,13 +258,21 @@ start_app() {
     rm -f "\${SOCKET_PATH}"
     log_msg "Starting ${template.appName}"
 
+    # node:sqlite 在 Node 22.5-22.12 需要 --experimental-sqlite 标志，
+    # 更新的 22.x 已内置。按运行时实际情况决定，避免旧版本上数据库接口全部 500。
+    SQLITE_FLAG=""
+    if ! node -e "require('node:sqlite')" >/dev/null 2>&1; then
+        SQLITE_FLAG="--experimental-sqlite"
+        log_msg "node:sqlite requires --experimental-sqlite on this runtime"
+    fi
+
     APP_NAME=${appNameShell} \\
     APP_TITLE=${appTitleShell} \\
     GATEWAY_PREFIX=${gatewayPrefixShell} \\
     FNOS_SOCKET_PATH="\${SOCKET_PATH}" \\
     LOG_DIR="\${TRIM_PKGVAR}/log" \\
     STORAGE_DIR="\${TRIM_PKGVAR}/data" \\
-    node "\${SERVER_ENTRY}" >> "\${LOG_FILE}" 2>&1 &
+    node \${SQLITE_FLAG} "\${SERVER_ENTRY}" >> "\${LOG_FILE}" 2>&1 &
 
     printf "%s" "$!" > "\${PID_FILE}"
     sleep 1
