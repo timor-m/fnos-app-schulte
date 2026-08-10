@@ -71,18 +71,13 @@ onMounted(async () => {
   progress.value = loadProgress();
   doneCount.value = completedCount();
   // 服务器成绩优先（同账号多设备同步），失败时退回本机记录
-  const [me, classicMe] = await Promise.all([fetchMe("v3"), fetchMe("v2")]);
+  const me = await fetchMe();
   if (me) {
     serverBests.value = new Map(me.records.map((r) => [r.level, r.bestMs]));
     doneCount.value = me.summary.completed;
     progress.value = Math.max(progress.value, ...me.records.map((r) => r.level), 0);
   }
-  const classicProgress = Math.max(
-    loadProgress("v2"),
-    ...(classicMe?.records.map((record) => record.level) ?? []),
-    0
-  );
-  missedUnlock.value = highestUnseenLayoutUnlock(Math.max(progress.value, classicProgress));
+  missedUnlock.value = highestUnseenLayoutUnlock(progress.value);
 });
 
 /** 已通关关卡集合：服务器成绩优先，本机记录兜底 */

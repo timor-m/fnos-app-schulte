@@ -212,14 +212,6 @@ button {
   color: #fff;
 }
 
-.version-tabs button {
-  padding-inline: 13px;
-}
-
-.profile-version {
-  align-self: flex-end;
-}
-
 .level-picker {
   display: inline-flex;
   align-items: center;

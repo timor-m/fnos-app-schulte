@@ -12,11 +12,12 @@ import { fetchSession } from "./game/api";
 import { preloadAudio } from "./game/sound";
 import appIcon from "./assets/app-icon.png";
 
-type GameTarget = { level: number; seed: number | null; ruleset: Ruleset };
+type GameLocation = { level: number; seed: number | null; ruleset: Ruleset };
+type GameTarget = GameLocation & { autoStart: boolean };
 type View = "home" | "leaderboard" | "me" | "game";
 
 const view = ref<View>("home");
-const target = ref<GameTarget>({ level: 1, seed: null, ruleset: "v3" });
+const target = ref<GameTarget>({ level: 1, seed: null, ruleset: "v3", autoStart: false });
 const username = ref<string | null>(null);
 const settingsOpen = ref(false);
 
@@ -30,8 +31,13 @@ function updateSettings(patch: Partial<GameSettings>) {
 
 provide("settings", settings);
 
-function openGame(level: number, ruleset: Ruleset = "v3", seed: number | null = null) {
-  target.value = { level: clampLevel(level), seed, ruleset };
+function openGame(
+  level: number,
+  ruleset: Ruleset = "v3",
+  seed: number | null = null,
+  autoStart = false
+) {
+  target.value = { level: clampLevel(level), seed, ruleset, autoStart };
   view.value = "game";
   syncUrl(target.value);
 }
@@ -52,12 +58,11 @@ function goTab(tab: Exclude<View, "game">) {
   }
 }
 
-function syncUrl(t: GameTarget) {
+function syncUrl(t: GameLocation) {
   const url = new URL(window.location.href);
   url.search = "";
   url.searchParams.set("level", String(t.level));
-  if (t.ruleset === "v3") url.searchParams.set("r", "3");
-  // 默认方案不携带种子，保持链接干净；换版后的自定义方案带上种子
+  // 默认方案不携带种子，保持链接干净；重新排版后的自定义方案带上种子
   if (t.seed !== null && t.seed !== canonicalSeed(t.level, t.ruleset)) {
     url.searchParams.set("s", String(t.seed));
   }
@@ -68,7 +73,6 @@ function shareUrl(level: number, seed: number | null, ruleset: Ruleset): string 
   const url = new URL(window.location.href);
   url.search = "";
   url.searchParams.set("level", String(level));
-  if (ruleset === "v3") url.searchParams.set("r", "3");
   if (seed !== null && seed !== canonicalSeed(level, ruleset)) {
     url.searchParams.set("s", String(seed));
   }
@@ -80,9 +84,9 @@ onMounted(async () => {
   const params = new URLSearchParams(window.location.search);
   const levelParam = Number(params.get("level"));
   if (Number.isFinite(levelParam) && levelParam >= 1) {
-    const ruleset: Ruleset = params.get("r") === "3" ? "v3" : "v2";
-    target.value = { level: clampLevel(levelParam), seed: parseSeed(params.get("s")), ruleset };
+    target.value = { level: clampLevel(levelParam), seed: parseSeed(params.get("s")), ruleset: "v3", autoStart: false };
     view.value = "game";
+    syncUrl(target.value);
   }
 
   const session = await fetchSession();
@@ -126,6 +130,7 @@ onMounted(async () => {
       :level="target.level"
       :seed="target.seed"
       :ruleset="target.ruleset"
+      :auto-start="target.autoStart"
       :share-url="shareUrl"
       @exit="goHome"
       @navigate="openGame"

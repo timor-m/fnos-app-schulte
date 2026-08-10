@@ -53,12 +53,13 @@ const props = defineProps<{
   level: number;
   seed: number | null;
   ruleset: Ruleset;
+  autoStart: boolean;
   shareUrl: (level: number, seed: number | null, ruleset: Ruleset) => string;
 }>();
 
 const emit = defineEmits<{
   (e: "exit"): void;
-  (e: "navigate", level: number, ruleset: Ruleset): void;
+  (e: "navigate", level: number, ruleset: Ruleset, seed: number | null, autoStart: boolean): void;
   (e: "seed-change", seed: number): void;
 }>();
 
@@ -205,7 +206,7 @@ function finish() {
   isNewBest.value = localBest;
   best.value = bestTime(props.level, props.ruleset);
 
-  void submitRecord({ level: props.level, ms, errors: errors.value, seed: currentSeed.value, ruleset: props.ruleset }).then((res) => {
+  void submitRecord({ level: props.level, ms, errors: errors.value, seed: currentSeed.value }).then((res) => {
     if (res) {
       isNewBest.value = res.isNewBest;
       best.value = res.best;
@@ -287,7 +288,7 @@ function nextLevel() {
       unlockOpen.value = true;
       return;
     }
-    emit("navigate", props.level + 1, props.ruleset);
+    emit("navigate", props.level + 1, props.ruleset, null, true);
   }
 }
 
@@ -295,7 +296,7 @@ function playUnlockedLayout() {
   const unlock = layoutUnlockAfter(props.level);
   if (!unlock) return;
   markLayoutUnlockSeen(unlock.level);
-  emit("navigate", unlock.level, props.ruleset);
+  emit("navigate", unlock.level, props.ruleset, null, true);
 }
 
 function deferUnlockedLayout() {
@@ -314,6 +315,7 @@ function onKeydown(event: KeyboardEvent) {
 onMounted(() => {
   // 进入对局页即开始加载音效资源，点击开始时只负责解锁与播放。
   if (settings.sound) preloadAudio();
+  if (props.autoStart) begin();
   window.addEventListener("keydown", onKeydown);
 });
 onBeforeUnmount(() => {

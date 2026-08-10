@@ -1,17 +1,32 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { Grid3x3, Play, TrendingUp } from "lucide-vue-next";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import {
+  CircleDot,
+  Diamond,
+  Fan,
+  Flower2,
+  Grid3x3,
+  Hexagon,
+  Orbit,
+  Play,
+  RectangleHorizontal,
+  Route,
+  Shell,
+  Sparkles,
+  TrendingUp,
+  Triangle,
+  Waves
+} from "lucide-vue-next";
 import { fetchMe, fetchMyPlays, type MeData, type PlayItem } from "../game/api";
-import { firstPlayableLevel, shapeForLevel, shapeName, type Ruleset } from "../game/levels";
+import { firstPlayableLevel, shapeForLevel, type BoardShape } from "../game/levels";
 import { formatElapsed } from "../game/format";
 
 const emit = defineEmits<{
-  (e: "play", level: number, ruleset: Ruleset): void;
+  (e: "play", level: number): void;
 }>();
 
 const me = ref<MeData | null>(null);
 const loading = ref(true);
-const ruleset = ref<Ruleset>("v3");
 
 // 最近成绩：首屏来自 /api/me，之后按游标滚动加载
 const plays = ref<PlayItem[]>([]);
@@ -21,13 +36,29 @@ const loadError = ref(false);
 const sentinel = ref<HTMLElement | null>(null);
 let observer: IntersectionObserver | null = null;
 
+const shapeIcons: Record<BoardShape, typeof Grid3x3> = {
+  grid: Grid3x3,
+  hex: Hexagon,
+  radial: CircleDot,
+  spiral: Shell,
+  scatter: Sparkles,
+  triangle: Triangle,
+  wave: Waves,
+  fan: Fan,
+  orbit: Orbit,
+  diamond: Diamond,
+  petal: Flower2,
+  track: RectangleHorizontal,
+  snake: Route
+};
+
 async function loadProfile() {
   loading.value = true;
   observer?.disconnect();
   observer = null;
   plays.value = [];
   playsCursor.value = null;
-  me.value = await fetchMe(ruleset.value);
+  me.value = await fetchMe();
   loading.value = false;
   if (me.value) {
     plays.value = me.value.recentPlays;
@@ -46,7 +77,6 @@ async function loadProfile() {
 }
 
 onMounted(() => void loadProfile());
-watch(ruleset, () => void loadProfile());
 
 onBeforeUnmount(() => observer?.disconnect());
 
@@ -54,7 +84,7 @@ async function loadMore() {
   if (loadingMore.value || playsCursor.value === null) return;
   loadingMore.value = true;
   loadError.value = false;
-  const res = await fetchMyPlays(playsCursor.value, ruleset.value);
+  const res = await fetchMyPlays(playsCursor.value);
   loadingMore.value = false;
   if (!res) {
     loadError.value = true;
@@ -98,10 +128,6 @@ function relativeTime(ts: number): string {
 
 <template>
   <main class="me-page">
-    <div class="scope-tabs version-tabs profile-version" aria-label="规则版本">
-      <button type="button" :class="{ active: ruleset === 'v3' }" @click="ruleset = 'v3'">当前版</button>
-      <button type="button" :class="{ active: ruleset === 'v2' }" @click="ruleset = 'v2'">经典版</button>
-    </div>
     <div v-if="loading" class="board-empty">加载中…</div>
 
     <template v-else-if="me">
@@ -115,7 +141,7 @@ function relativeTime(ts: number): string {
         <button
           type="button"
           class="btn primary me-continue"
-          @click="emit('play', firstPlayableLevel(new Set(me.records.map((r) => r.level))), ruleset)"
+          @click="emit('play', firstPlayableLevel(new Set(me.records.map((r) => r.level))))"
         >
           <Play :size="16" fill="currentColor" />继续训练
         </button>
@@ -167,9 +193,9 @@ function relativeTime(ts: number): string {
         <div v-else class="play-list">
           <div v-for="play in plays" :key="play.id" class="play-row">
             <span class="play-shape">
-              <Grid3x3 :size="15" />
+              <component :is="shapeIcons[shapeForLevel(play.level)]" :size="16" aria-hidden="true" />
             </span>
-            <span class="play-level">第 {{ play.level }} 关 · {{ shapeName(shapeForLevel(play.level, play.ruleset)) }}</span>
+            <span class="play-level">第 {{ play.level }} 关</span>
             <span class="play-ms mono">{{ formatElapsed(play.ms) }}</span>
             <span class="play-err" :class="{ clean: play.errors === 0 }">
               {{ play.errors === 0 ? "零失误" : `失误 ${play.errors}` }}

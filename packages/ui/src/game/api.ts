@@ -1,5 +1,3 @@
-import type { Ruleset } from "./levels";
-
 // 以构建期确定的网关前缀为基准拼接 API 地址：
 // 不能用 "./api/" 相对当前页面 URL 解析——fnOS 桌面入口的 iframe 地址不带尾斜杠时，
 // 相对解析会丢一级路径变成 /app/api/*（404）。
@@ -26,7 +24,7 @@ async function get<T>(path: string): Promise<T | null> {
 
 export type Identity = { uid: string; username: string; guest: boolean };
 
-export type PlayItem = { id: number; level: number; ms: number; errors: number; ruleset: Ruleset; playedAt: number };
+export type PlayItem = { id: number; level: number; ms: number; errors: number; playedAt: number };
 
 export type OverallEntry = {
   uid: string;
@@ -52,7 +50,6 @@ export type LevelEntry = {
 
 export type MeData = {
   user: Identity;
-  ruleset: Ruleset;
   summary: {
     completed: number;
     totalPlays: number;
@@ -67,8 +64,8 @@ export type MeData = {
   playsCursor: number | null;
 };
 
-export function fetchMe(ruleset: Ruleset = "v3"): Promise<MeData | null> {
-  return get<MeData>(`me?ruleset=${ruleset}`);
+export function fetchMe(): Promise<MeData | null> {
+  return get<MeData>("me");
 }
 
 export type SessionInfo = {
@@ -82,16 +79,16 @@ export function fetchSession(): Promise<SessionInfo | null> {
   return get<SessionInfo>("session");
 }
 
-export function fetchMyPlays(cursor: number, ruleset: Ruleset = "v3"): Promise<{ plays: PlayItem[]; nextCursor: number | null } | null> {
-  return get<{ plays: PlayItem[]; nextCursor: number | null }>(`me-plays?cursor=${cursor}&ruleset=${ruleset}`);
+export function fetchMyPlays(cursor: number): Promise<{ plays: PlayItem[]; nextCursor: number | null } | null> {
+  return get<{ plays: PlayItem[]; nextCursor: number | null }>(`me-plays?cursor=${cursor}`);
 }
 
-export function fetchOverallBoard(ruleset: Ruleset = "v3"): Promise<{ entries: OverallEntry[] } | null> {
-  return get<{ entries: OverallEntry[] }>(`leaderboard?ruleset=${ruleset}`);
+export function fetchOverallBoard(): Promise<{ entries: OverallEntry[] } | null> {
+  return get<{ entries: OverallEntry[] }>("leaderboard");
 }
 
-export function fetchLevelBoard(level: number, ruleset: Ruleset = "v3"): Promise<{ entries: LevelEntry[] } | null> {
-  return get<{ entries: LevelEntry[] }>(`leaderboard?level=${level}&ruleset=${ruleset}`);
+export function fetchLevelBoard(level: number): Promise<{ entries: LevelEntry[] } | null> {
+  return get<{ entries: LevelEntry[] }>(`leaderboard?level=${level}`);
 }
 
 export type SubmitResult = { best: number; isNewBest: boolean; plays: number };
@@ -101,7 +98,6 @@ export async function submitRecord(payload: {
   ms: number;
   errors: number;
   seed: number | null;
-  ruleset: Ruleset;
 }): Promise<SubmitResult | null> {
   try {
     const res = await fetch(apiUrl("records"), {

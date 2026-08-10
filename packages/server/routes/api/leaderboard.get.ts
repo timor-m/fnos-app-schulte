@@ -2,7 +2,7 @@ import { defineEventHandler, getQuery } from "h3";
 import { ok } from "../../utils/api-response";
 import { getIdentity } from "../../utils/identity";
 import { getDb } from "../../services/db";
-import { isRuleset } from "../../../shared/levels";
+import { mergedLevelLeaderboard, mergedOverallLeaderboard } from "../../services/scores";
 
 /**
  * 家庭排行榜：
@@ -12,40 +12,17 @@ import { isRuleset } from "../../../shared/levels";
 export default defineEventHandler((event) => {
   const identity = getIdentity(event);
   const query = getQuery(event);
-  const ruleset = isRuleset(query.ruleset) ? query.ruleset : "v3";
   const db = getDb();
 
   if (query.level !== undefined) {
     const level = Number(query.level);
-    const rows = db
-      .prepare(
-        `SELECT u.uid, u.username, b.best_ms AS bestMs, b.plays, b.updated_at AS updatedAt
-         FROM bests_rulesets b JOIN users u ON u.uid = b.uid
-         WHERE b.ruleset = ? AND b.level = ?
-         ORDER BY b.best_ms ASC
-         LIMIT 50`
-      )
-      .all(ruleset, level) as Array<Record<string, unknown>>;
-    return ok({ scope: "level", level, ruleset, entries: withRank(rows, identity.uid) });
+    const rows = mergedLevelLeaderboard(db, level);
+    return ok({ scope: "level", level, entries: withRank(rows, identity.uid) });
   }
 
-  const rows = db
-    .prepare(
-      `SELECT u.uid, u.username,
-              COUNT(b.level) AS completed,
-              COALESCE(SUM(b.plays), 0) AS totalPlays,
-              COALESCE(AVG(b.best_ms), 0) AS avgBestMs,
-              COALESCE(SUM(b.best_ms), 0) AS totalBestMs,
-              MAX(b.updated_at) AS lastActive
-       FROM users u
-       JOIN bests_rulesets b ON b.uid = u.uid AND b.ruleset = ?
-       GROUP BY u.uid
-       ORDER BY completed DESC, avgBestMs ASC
-       LIMIT 50`
-    )
-    .all(ruleset) as Array<Record<string, unknown>>;
+  const rows = mergedOverallLeaderboard(db);
 
-  return ok({ scope: "overall", ruleset, entries: withRank(rows, identity.uid) });
+  return ok({ scope: "overall", entries: withRank(rows, identity.uid) });
 });
 
 function withRank(rows: Array<Record<string, unknown>>, currentUid: string) {

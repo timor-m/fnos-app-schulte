@@ -2,7 +2,6 @@ import { defineEventHandler, getQuery } from "h3";
 import { fail, ok } from "../../utils/api-response";
 import { getIdentity } from "../../utils/identity";
 import { getDb } from "../../services/db";
-import { isRuleset } from "../../../shared/levels";
 
 const DEFAULT_PAGE_SIZE = 15;
 const MAX_PAGE_SIZE = 50;
@@ -15,7 +14,6 @@ export default defineEventHandler((event) => {
   const query = getQuery(event);
   const cursor = Number(query.cursor);
   const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(query.limit) || DEFAULT_PAGE_SIZE));
-  const ruleset = isRuleset(query.ruleset) ? query.ruleset : "v3";
 
   if (!Number.isInteger(cursor) || cursor < 1) {
     return fail("无效的游标");
@@ -25,14 +23,13 @@ export default defineEventHandler((event) => {
   const db = getDb();
   const rows = db
     .prepare(
-      "SELECT id, level, ms, errors, ruleset, played_at AS playedAt FROM plays WHERE uid = ? AND ruleset = ? AND id < ? ORDER BY id DESC LIMIT ?"
+      "SELECT id, level, ms, errors, played_at AS playedAt FROM plays WHERE uid = ? AND id < ? ORDER BY id DESC LIMIT ?"
     )
-    .all(identity.uid, ruleset, cursor, limit + 1) as Array<{
+    .all(identity.uid, cursor, limit + 1) as Array<{
     id: number;
     level: number;
     ms: number;
     errors: number;
-    ruleset: string;
     playedAt: number;
   }>;
 
