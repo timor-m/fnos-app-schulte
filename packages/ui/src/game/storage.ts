@@ -1,6 +1,15 @@
-const PROGRESS_KEY = "schulte:progress:v2";
-const RECORDS_KEY = "schulte:records:v2";
+import { LAYOUT_UNLOCKS, type LayoutUnlock, type Ruleset } from "./levels";
+
 const SETTINGS_KEY = "schulte:settings:v2";
+const UNLOCKS_KEY = "schulte:layout-unlocks:v3";
+
+function progressKey(ruleset: Ruleset): string {
+  return `schulte:progress:${ruleset}`;
+}
+
+function recordsKey(ruleset: Ruleset): string {
+  return `schulte:records:${ruleset}`;
+}
 
 export type RecordsMap = Record<string, number>;
 
@@ -33,9 +42,9 @@ function writeJson(key: string, value: unknown): void {
 }
 
 /** 已完成的最大关卡号，0 表示尚未通关任何关卡 */
-export function loadProgress(): number {
+export function loadProgress(ruleset: Ruleset = "v3"): number {
   try {
-    const raw = localStorage.getItem(PROGRESS_KEY);
+    const raw = localStorage.getItem(progressKey(ruleset));
     const value = raw ? Number(JSON.parse(raw)) : 0;
     return Number.isFinite(value) ? value : 0;
   } catch {
@@ -43,38 +52,63 @@ export function loadProgress(): number {
   }
 }
 
-export function saveProgress(level: number): void {
-  writeJson(PROGRESS_KEY, level);
+export function saveProgress(level: number, ruleset: Ruleset = "v3"): void {
+  writeJson(progressKey(ruleset), level);
 }
 
-export function loadRecords(): RecordsMap {
+export function loadRecords(ruleset: Ruleset = "v3"): RecordsMap {
   try {
-    const raw = localStorage.getItem(RECORDS_KEY);
+    const raw = localStorage.getItem(recordsKey(ruleset));
     return raw ? (JSON.parse(raw) as RecordsMap) : {};
   } catch {
     return {};
   }
 }
 
-export function bestTime(level: number): number | null {
-  const value = loadRecords()[`lv:${level}`];
+export function bestTime(level: number, ruleset: Ruleset = "v3"): number | null {
+  const value = loadRecords(ruleset)[`lv:${level}`];
   return typeof value === "number" ? value : null;
 }
 
-export function saveRecord(level: number, ms: number): boolean {
-  const records = loadRecords();
+export function saveRecord(level: number, ms: number, ruleset: Ruleset = "v3"): boolean {
+  const records = loadRecords(ruleset);
   const key = `lv:${level}`;
   const previous = records[key];
   const isBest = typeof previous !== "number" || ms < previous;
   if (isBest) {
     records[key] = ms;
-    writeJson(RECORDS_KEY, records);
+    writeJson(recordsKey(ruleset), records);
   }
   return isBest;
 }
 
-export function completedCount(): number {
-  return Object.keys(loadRecords()).length;
+export function completedCount(ruleset: Ruleset = "v3"): number {
+  return Object.keys(loadRecords(ruleset)).length;
+}
+
+export function seenLayoutUnlocks(): Set<number> {
+  try {
+    const raw = localStorage.getItem(UNLOCKS_KEY);
+    const values = raw ? (JSON.parse(raw) as unknown[]) : [];
+    return new Set(values.filter((value): value is number => Number.isInteger(value)));
+  } catch {
+    return new Set();
+  }
+}
+
+export function markLayoutUnlockSeen(level: number): void {
+  const seen = seenLayoutUnlocks();
+  for (const unlock of LAYOUT_UNLOCKS) {
+    if (unlock.afterLevel !== null && unlock.level <= level) seen.add(unlock.level);
+  }
+  writeJson(UNLOCKS_KEY, [...seen].sort((a, b) => a - b));
+}
+
+export function highestUnseenLayoutUnlock(progress: number): LayoutUnlock | null {
+  const seen = seenLayoutUnlocks();
+  return [...LAYOUT_UNLOCKS]
+    .filter((unlock) => unlock.afterLevel !== null && unlock.afterLevel <= progress && !seen.has(unlock.level))
+    .sort((a, b) => b.level - a.level)[0] ?? null;
 }
 
 export function loadSettings(): GameSettings {
@@ -87,8 +121,11 @@ export function saveSettings(settings: GameSettings): void {
 
 export function clearAllData(): void {
   try {
-    localStorage.removeItem(PROGRESS_KEY);
-    localStorage.removeItem(RECORDS_KEY);
+    for (const ruleset of ["v2", "v3"] as const) {
+      localStorage.removeItem(progressKey(ruleset));
+      localStorage.removeItem(recordsKey(ruleset));
+    }
+    localStorage.removeItem(UNLOCKS_KEY);
   } catch {
     // ignore
   }

@@ -6,25 +6,17 @@ import GameView from "./views/GameView.vue";
 import LeaderboardView from "./views/LeaderboardView.vue";
 import ProfileView from "./views/ProfileView.vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
-import { clampLevel, canonicalSeed, parseSeed } from "./game/levels";
+import { clampLevel, canonicalSeed, parseSeed, type Ruleset } from "./game/levels";
 import { loadSettings, saveSettings, type GameSettings, DEFAULT_SETTINGS } from "./game/storage";
+import { fetchSession } from "./game/api";
+import { preloadAudio } from "./game/sound";
 import appIcon from "./assets/app-icon.png";
 
-type SessionResponse = {
-  ok: boolean;
-  data: {
-    authenticated: boolean;
-    uid: string | null;
-    username: string | null;
-    isAdmin: boolean;
-  };
-};
-
-type GameTarget = { level: number; seed: number | null };
+type GameTarget = { level: number; seed: number | null; ruleset: Ruleset };
 type View = "home" | "leaderboard" | "me" | "game";
 
 const view = ref<View>("home");
-const target = ref<GameTarget>({ level: 1, seed: null });
+const target = ref<GameTarget>({ level: 1, seed: null, ruleset: "v3" });
 const username = ref<string | null>(null);
 const settingsOpen = ref(false);
 
@@ -33,12 +25,13 @@ const settings = reactive<GameSettings>({ ...DEFAULT_SETTINGS, ...loadSettings()
 function updateSettings(patch: Partial<GameSettings>) {
   Object.assign(settings, patch);
   saveSettings({ ...settings });
+  if (typeof patch.sound === "boolean") preloadAudio();
 }
 
 provide("settings", settings);
 
-function openGame(level: number, seed: number | null = null) {
-  target.value = { level: clampLevel(level), seed };
+function openGame(level: number, ruleset: Ruleset = "v3", seed: number | null = null) {
+  target.value = { level: clampLevel(level), seed, ruleset };
   view.value = "game";
   syncUrl(target.value);
 }
@@ -63,18 +56,20 @@ function syncUrl(t: GameTarget) {
   const url = new URL(window.location.href);
   url.search = "";
   url.searchParams.set("level", String(t.level));
+  if (t.ruleset === "v3") url.searchParams.set("r", "3");
   // 默认方案不携带种子，保持链接干净；换版后的自定义方案带上种子
-  if (t.seed !== null && t.seed !== canonicalSeed(t.level)) {
+  if (t.seed !== null && t.seed !== canonicalSeed(t.level, t.ruleset)) {
     url.searchParams.set("s", String(t.seed));
   }
   window.history.replaceState(null, "", url.toString());
 }
 
-function shareUrl(level: number, seed: number | null): string {
+function shareUrl(level: number, seed: number | null, ruleset: Ruleset): string {
   const url = new URL(window.location.href);
   url.search = "";
   url.searchParams.set("level", String(level));
-  if (seed !== null && seed !== canonicalSeed(level)) {
+  if (ruleset === "v3") url.searchParams.set("r", "3");
+  if (seed !== null && seed !== canonicalSeed(level, ruleset)) {
     url.searchParams.set("s", String(seed));
   }
   return url.toString();
@@ -85,20 +80,13 @@ onMounted(async () => {
   const params = new URLSearchParams(window.location.search);
   const levelParam = Number(params.get("level"));
   if (Number.isFinite(levelParam) && levelParam >= 1) {
-    target.value = { level: clampLevel(levelParam), seed: parseSeed(params.get("s")) };
+    const ruleset: Ruleset = params.get("r") === "3" ? "v3" : "v2";
+    target.value = { level: clampLevel(levelParam), seed: parseSeed(params.get("s")), ruleset };
     view.value = "game";
   }
 
-  try {
-    const apiBase = new URL("./api/", window.location.href);
-    const res = await fetch(new URL("session", apiBase));
-    if (res.ok) {
-      const json = (await res.json()) as SessionResponse;
-      username.value = json.data.username;
-    }
-  } catch {
-    // 本地开发未经过网关时忽略
-  }
+  const session = await fetchSession();
+  username.value = session?.username ?? null;
 });
 </script>
 
@@ -123,7 +111,6 @@ onMounted(async () => {
             <CircleUserRound :size="16" /><span>我的</span>
           </button>
         </nav>
-        <span v-if="username" class="user-chip" :title="`fnOS 用户：${username}`">{{ username }}</span>
         <button class="icon-btn" type="button" aria-label="设置" title="设置" @click="settingsOpen = true">
           <Settings :size="20" :stroke-width="1.8" />
         </button>
@@ -135,13 +122,14 @@ onMounted(async () => {
     <ProfileView v-else-if="view === 'me'" @play="openGame" />
     <GameView
       v-else
-      :key="`${target.level}:${target.seed ?? 'canon'}`"
+      :key="`${target.ruleset}:${target.level}:${target.seed ?? 'canon'}`"
       :level="target.level"
       :seed="target.seed"
+      :ruleset="target.ruleset"
       :share-url="shareUrl"
       @exit="goHome"
       @navigate="openGame"
-      @seed-change="(s) => syncUrl({ level: target.level, seed: s })"
+      @seed-change="(s) => syncUrl({ level: target.level, seed: s, ruleset: target.ruleset })"
     />
 
     <SettingsDialog

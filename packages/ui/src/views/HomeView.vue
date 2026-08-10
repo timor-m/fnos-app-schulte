@@ -1,21 +1,46 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { Check, Grid3x3, Hexagon, Lock, Play, Timer } from "lucide-vue-next";
+import {
+  Check,
+  CircleDot,
+  Diamond,
+  Fan,
+  Flower2,
+  Grid3x3,
+  Hexagon,
+  Lock,
+  Orbit,
+  Play,
+  RectangleHorizontal,
+  Route,
+  Shell,
+  Sparkles,
+  Timer,
+  Triangle,
+  Waves
+} from "lucide-vue-next";
 import {
   LEVEL_BANDS,
   MAX_LEVEL,
   SEQUENTIAL_FROM_LEVEL,
   firstPlayableLevel,
-  gridSizeForLevel,
   isLevelUnlocked,
   levelBand,
-  shapeForLevel,
+  levelProfileForLevel,
   shapeName,
   timeLimitForLevel
 } from "../game/levels";
-import { bestTime, completedCount, loadProgress } from "../game/storage";
+import {
+  bestTime,
+  completedCount,
+  highestUnseenLayoutUnlock,
+  loadProgress,
+  markLayoutUnlockSeen
+} from "../game/storage";
 import { formatElapsed } from "../game/format";
 import { fetchMe } from "../game/api";
+import LayoutUnlockDialog from "../components/LayoutUnlockDialog.vue";
+import type { BoardShape, LayoutUnlock } from "../game/levels";
 
 const emit = defineEmits<{
   (e: "start", level: number): void;
@@ -24,17 +49,40 @@ const emit = defineEmits<{
 const progress = ref(0);
 const doneCount = ref(0);
 const serverBests = ref<Map<number, number>>(new Map());
+const missedUnlock = ref<LayoutUnlock | null>(null);
 
-onMounted(() => {
+const shapeIcons: Record<BoardShape, typeof Grid3x3> = {
+  grid: Grid3x3,
+  hex: Hexagon,
+  radial: CircleDot,
+  spiral: Shell,
+  scatter: Sparkles,
+  triangle: Triangle,
+  wave: Waves,
+  fan: Fan,
+  orbit: Orbit,
+  diamond: Diamond,
+  petal: Flower2,
+  track: RectangleHorizontal,
+  snake: Route
+};
+
+onMounted(async () => {
   progress.value = loadProgress();
   doneCount.value = completedCount();
   // 服务器成绩优先（同账号多设备同步），失败时退回本机记录
-  void fetchMe().then((me) => {
-    if (!me) return;
+  const [me, classicMe] = await Promise.all([fetchMe("v3"), fetchMe("v2")]);
+  if (me) {
     serverBests.value = new Map(me.records.map((r) => [r.level, r.bestMs]));
     doneCount.value = me.summary.completed;
     progress.value = Math.max(progress.value, ...me.records.map((r) => r.level), 0);
-  });
+  }
+  const classicProgress = Math.max(
+    loadProgress("v2"),
+    ...(classicMe?.records.map((record) => record.level) ?? []),
+    0
+  );
+  missedUnlock.value = highestUnseenLayoutUnlock(Math.max(progress.value, classicProgress));
 });
 
 /** 已通关关卡集合：服务器成绩优先，本机记录兜底 */
@@ -52,10 +100,12 @@ const levels = computed(() =>
   Array.from({ length: MAX_LEVEL }, (_, i) => {
     const level = i + 1;
     const best = serverBests.value.get(level) ?? bestTime(level);
-    const shape = shapeForLevel(level);
+    const profile = levelProfileForLevel(level);
+    const shape = profile.shape;
     return {
       level,
-      size: gridSizeForLevel(level),
+      targetCount: profile.targetCount,
+      distractorCount: profile.distractorCount,
       band: levelBand(level),
       shape,
       shapeLabel: shapeName(shape),
@@ -65,6 +115,22 @@ const levels = computed(() =>
     };
   })
 );
+
+const nextProfile = computed(() => levelProfileForLevel(nextLevel.value));
+
+function playMissedUnlock() {
+  if (!missedUnlock.value) return;
+  const level = missedUnlock.value.level;
+  markLayoutUnlockSeen(level);
+  missedUnlock.value = null;
+  emit("start", level);
+}
+
+function dismissMissedUnlock() {
+  if (!missedUnlock.value) return;
+  markLayoutUnlockSeen(missedUnlock.value.level);
+  missedUnlock.value = null;
+}
 
 // 段位导航：与 packages/shared/levels.ts 的段位划分保持一致
 const bands = LEVEL_BANDS;
@@ -139,7 +205,7 @@ onBeforeUnmount(() => {
     <section class="home-hero">
       <div class="hero-info">
         <h1>舒尔特训练</h1>
-        <p>方格与蜂巢混合排布，按 1 到 N 的顺序依次点按，训练视觉搜索与专注力。</p>
+        <p>13 种布局渐进穿插，按 1 到 N 的顺序点按，并从第 200 关起避开字母干扰。</p>
         <div class="hero-stats">
           <span>已完成 <strong>{{ doneCount }}</strong> / {{ MAX_LEVEL }} 关</span>
           <span class="dot" aria-hidden="true"></span>
@@ -149,7 +215,8 @@ onBeforeUnmount(() => {
       <button class="continue-btn" type="button" @click="emit('start', nextLevel)">
         <span class="continue-label"><Play :size="17" fill="currentColor" />{{ doneCount > 0 ? "继续训练" : "开始训练" }}</span>
         <span class="continue-level">
-          第 {{ nextLevel }} 关 · {{ shapeName(shapeForLevel(nextLevel)) }} {{ gridSizeForLevel(nextLevel) }}×{{ gridSizeForLevel(nextLevel) }}
+          第 {{ nextLevel }} 关 · {{ shapeName(nextProfile.shape) }} · {{ nextProfile.targetCount }} 个数字
+          <template v-if="nextProfile.distractorCount"> + {{ nextProfile.distractorCount }} 字母</template>
         </span>
       </button>
     </section>
@@ -192,13 +259,12 @@ onBeforeUnmount(() => {
           :class="{ done: item.done, current: item.level === nextLevel, locked: item.locked }"
           :aria-disabled="item.locked || undefined"
           :title="item.locked ? `通关第 ${item.level - 1} 关后解锁` : undefined"
-          :aria-label="item.locked ? `第 ${item.level} 关，未解锁` : `第 ${item.level} 关，${item.shapeLabel} ${item.size}×${item.size}`"
+          :aria-label="item.locked ? `第 ${item.level} 关，未解锁` : `第 ${item.level} 关，${item.shapeLabel}，${item.targetCount} 个数字，${item.distractorCount} 个字母干扰`"
           @click="onLevelTap(item)"
         >
           <span class="lc-top">
             <span class="level-num">{{ item.level }}</span>
-            <Hexagon v-if="item.shape === 'hex'" :size="13" class="lc-shape hex" />
-            <Grid3x3 v-else :size="13" class="lc-shape" />
+            <component :is="shapeIcons[item.shape]" :size="13" class="lc-shape" />
           </span>
           <span class="lc-bottom">
             <template v-if="item.locked">
@@ -208,7 +274,9 @@ onBeforeUnmount(() => {
               <Check :size="11" class="lc-check" />{{ formatElapsed(item.best!) }}
             </template>
             <template v-else>
-              {{ item.size }}×{{ item.size }}<Timer v-if="timeLimitForLevel(item.level)" :size="10" class="lc-timer" />
+              {{ item.targetCount }} 数字
+              <span v-if="item.distractorCount" class="lc-distractors">+{{ item.distractorCount }} 字母</span>
+              <Timer v-if="timeLimitForLevel(item.level)" :size="10" class="lc-timer" />
             </template>
           </span>
         </button>
@@ -218,5 +286,12 @@ onBeforeUnmount(() => {
     <p class="home-tip">1-{{ SEQUENTIAL_FROM_LEVEL - 1 }} 关全部开放，{{ SEQUENTIAL_FROM_LEVEL }} 关起需逐关通关解锁；同一关的排布与配色默认固定，分享链接可直接挑战同一局面。</p>
 
     <div v-if="lockTip" class="toast" role="status"><Lock :size="14" />{{ lockTip }}</div>
+
+    <LayoutUnlockDialog
+      v-if="missedUnlock"
+      :unlock="missedUnlock"
+      @play="playMissedUnlock"
+      @later="dismissMissedUnlock"
+    />
   </main>
 </template>

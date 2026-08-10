@@ -25,6 +25,8 @@ html,
 body {
   margin: 0;
   min-height: 100vh;
+  /* 只允许平移滚动，禁止双指捏合与双击缩放 */
+  touch-action: pan-x pan-y;
 }
 
 body {
@@ -41,6 +43,7 @@ button {
   font: inherit;
   color: inherit;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .mono {
@@ -182,6 +185,7 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .scope-tabs {
@@ -206,6 +210,14 @@ button {
 .scope-tabs button.active {
   background: var(--brand);
   color: #fff;
+}
+
+.version-tabs button {
+  padding-inline: 13px;
+}
+
+.profile-version {
+  align-self: flex-end;
 }
 
 .level-picker {
@@ -727,10 +739,27 @@ button {
 }
 
 .dialog-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 10px;
+  width: 100%;
+}
+
+.dialog-actions.actions-2,
+.dialog-actions.actions-4 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dialog-actions.actions-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dialog-actions .btn {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
   justify-content: center;
+  padding: 10px 12px;
+  white-space: nowrap;
 }
 
 /* ---------- 倒计时与结算弹窗 ---------- */
@@ -774,14 +803,22 @@ button {
   overflow: hidden;
 }
 
+.dialog-win > :not(.confetti) {
+  position: relative;
+  z-index: 1;
+}
+
 .confetti {
   position: absolute;
-  top: -12px;
+  z-index: 0;
+  top: 116px;
   width: 8px;
   height: 14px;
   border-radius: 2px;
-  opacity: 0.9;
-  animation: confetti-fall 1.5s ease-in forwards;
+  opacity: 0;
+  animation: confetti-burst var(--confetti-duration) linear forwards;
+  animation-delay: var(--confetti-delay);
+  transform-origin: center;
   pointer-events: none;
 }
 
@@ -791,13 +828,38 @@ button {
   border-radius: 50%;
 }
 
-@keyframes confetti-fall {
+.confetti.strip {
+  width: 5px;
+  height: 17px;
+  border-radius: 1px;
+}
+
+@keyframes confetti-burst {
   0% {
-    transform: translateY(0) rotate(0deg);
+    transform: translate3d(0, 0, 0) rotate(var(--confetti-start-rotation)) scale(0.55);
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.16, 0.72, 0.35, 1);
+  }
+  7% {
+    opacity: 0.95;
+  }
+  31% {
+    transform: translate3d(var(--confetti-burst-x), var(--confetti-burst-y), 0)
+      rotate(var(--confetti-middle-rotation)) scale(var(--confetti-scale));
     opacity: 1;
+    animation-timing-function: cubic-bezier(0.28, 0.05, 0.55, 1);
+  }
+  58% {
+    transform: translate3d(var(--confetti-drift-x), var(--confetti-drift-y), 0)
+      rotate(var(--confetti-flutter-rotation)) scaleX(0.35) scaleY(var(--confetti-scale));
+    opacity: 0.92;
+  }
+  78% {
+    opacity: 0.82;
   }
   100% {
-    transform: translateY(460px) rotate(300deg);
+    transform: translate3d(var(--confetti-fall-x), var(--confetti-fall-y), 0)
+      rotate(var(--confetti-end-rotation)) scaleX(var(--confetti-scale)) scaleY(0.55);
     opacity: 0;
   }
 }
@@ -1288,6 +1350,10 @@ button {
   white-space: nowrap;
 }
 
+.lc-distractors {
+  color: var(--accent);
+}
+
 .level-cell.done .lc-bottom {
   color: var(--brand-deep);
   font-weight: 600;
@@ -1409,7 +1475,6 @@ button {
   height: 100%;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--brand), var(--amber));
-  transition: width 0.18s ease;
 }
 
 .board-wrap {
@@ -1418,10 +1483,18 @@ button {
   padding: 8px 0 12px;
 }
 
+.board-shell {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+}
+
 .board {
   position: relative;
   width: min(92vw, 58vh, 560px);
-  touch-action: manipulation;
+  contain: layout paint style;
+  isolation: isolate;
+  touch-action: none;
   user-select: none;
 }
 
@@ -1429,83 +1502,109 @@ button {
 
 .grid-board {
   display: grid;
-  grid-template-columns: repeat(var(--k), 1fr);
-  gap: clamp(4px, calc(10px - var(--k) * 0.8px), 10px);
+  grid-template-columns: repeat(var(--grid-cols), 1fr);
+  grid-auto-rows: 1fr;
+  gap: clamp(2px, calc(10px - var(--grid-cols) * 1px), 8px);
   aspect-ratio: 1;
-  font-size: calc(min(92vw, 58vh, 560px) / var(--k) * 0.42);
+  font-size: calc(min(92vw, 58vh, 560px) / var(--grid-cols) * 0.42);
 }
 
 .cell {
-  border: 1px solid var(--line);
-  background: var(--surface);
+  position: relative;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  user-select: none;
+  border: 0;
+  background: transparent;
   font-size: 1em;
-  font-weight: 700;
+  display: grid;
+  grid-template: 1fr / 1fr;
+  padding: 0;
+  min-width: 40px;
+  min-height: 40px;
+}
+
+.cell-visual {
   display: grid;
   place-items: center;
-  padding: 0;
+  border: 1px solid var(--line);
+  font-weight: 700;
   box-shadow: 0 1px 3px rgba(46, 84, 60, 0.1);
-  transition: filter 0.12s ease, transform 0.08s ease, opacity 0.15s ease;
+  pointer-events: none;
 }
 
-.cell:hover:not(:disabled) {
-  filter: brightness(0.96);
+@media (hover: hover) and (pointer: fine) {
+  .cell:hover:not(:disabled) .cell-visual {
+    background-image: linear-gradient(rgba(43, 58, 48, 0.04), rgba(43, 58, 48, 0.04));
+  }
 }
 
-.cell:active:not(:disabled) {
-  transform: scale(0.94);
-}
-
-/* 点对的格子：轻微弹跳反馈后消隐，不留下已点标记 */
-.cell.wrong,
-.hex-g.wrong {
-  animation: shake 0.3s ease;
-}
-
-.cell.wrong {
+.cell.wrong .cell-visual {
   border-color: var(--danger);
   color: var(--danger) !important;
 }
 
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-4px); }
-  75% { transform: translateX(4px); }
-}
-
-/* 蜂巢棋盘：整张棋盘一个 SVG，尖顶六边形按精确几何无缝拼接 */
-
-.hex-stage {
+.vector-stage {
   width: min(94vw, 62vh, 620px);
+  aspect-ratio: 1;
 }
 
-.hex-svg {
+.vector-svg {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  overflow: visible;
 }
 
-.hex-g {
+.vector-cell {
+  -webkit-touch-callout: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+.vector-input-plane {
+  fill: transparent;
+  pointer-events: all;
   cursor: pointer;
-  transform-box: fill-box;
-  transform-origin: center;
 }
 
-.hex-poly {
-  stroke: #9db8a4;
-  stroke-width: 3;
+.vector-guides {
+  pointer-events: none;
+}
+
+.vector-guide {
+  fill: none;
+  stroke: #b8c9bd;
+  stroke-width: 2.5;
+  stroke-linecap: round;
   stroke-linejoin: round;
-  transition: filter 0.12s ease;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
 }
 
-.hex-g:hover .hex-poly {
-  filter: brightness(0.94);
+.vector-tile {
+  stroke: var(--line);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  pointer-events: none;
 }
 
-.hex-poly.wrong {
+@media (hover: hover) and (pointer: fine) {
+  .vector-cell:hover .vector-tile {
+    stroke: #779981;
+  }
+}
+
+.vector-cell.wrong .vector-tile {
   stroke: #d15b4a;
+  stroke-width: 5;
 }
 
-.hex-text {
+.vector-cell.wrong .vector-text {
+  fill: var(--danger);
+}
+
+.vector-text {
   font-weight: 700;
   text-anchor: middle;
   dominant-baseline: central;
@@ -1513,11 +1612,61 @@ button {
   user-select: none;
 }
 
+/* 对局中不启用任何动效或滤镜，避免低性能 WebView 合成与输入争抢主线程。 */
+.game *,
+.game *::before,
+.game *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+.game .ready-mask {
+  background: rgba(247, 251, 247, 0.96);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 /* 暂停遮罩：隐藏数字防止偷看 */
 
 .dimmed .cell,
-.dimmed .hex-g {
+.dimmed .vector-cell {
   visibility: hidden;
+}
+
+.board.preview {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+}
+
+.grid-board.preview {
+  font-size: calc(100% / var(--grid-cols));
+}
+
+.unlock-dialog {
+  width: min(500px, 100%);
+}
+
+.dialog-eyebrow.unlock {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.unlock-preview {
+  width: min(280px, 72vw);
+  aspect-ratio: 1;
+  margin: 14px auto;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.unlock-copy {
+  margin: 0 auto 20px;
+  max-width: 390px;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.6;
 }
 
 .pause-mask {
@@ -1618,6 +1767,41 @@ button {
   color: var(--muted);
 }
 
+/* 嵌入式 WebView 的合成器容易在 blur/filter/transform 动画后留下黑色残影。 */
+html.embedded-webview *,
+html.embedded-webview *::before,
+html.embedded-webview *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+html.embedded-webview body {
+  background: var(--bg);
+}
+
+html.embedded-webview .topbar,
+html.embedded-webview .dialog-backdrop,
+html.embedded-webview .ready-mask {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html.embedded-webview .topbar {
+  background: var(--surface);
+}
+
+html.embedded-webview .confetti {
+  display: none;
+}
+
+/* 仅通关结算恢复撒花；对局与其他弹窗仍保持无动效。 */
+.game .dialog-win .confetti,
+html.embedded-webview .game .dialog-win .confetti {
+  display: block;
+  animation: confetti-burst var(--confetti-duration) linear forwards !important;
+  animation-delay: var(--confetti-delay) !important;
+}
+
 /* ---------- 响应式 ---------- */
 
 @media (max-width: 760px) {
@@ -1671,11 +1855,17 @@ button {
   }
 
   .grid-board {
-    font-size: calc(min(94vw, 52vh) / var(--k) * 0.44);
+    font-size: calc(min(94vw, 52vh) / var(--grid-cols) * 0.44);
   }
 
-  .hex-stage {
+  .vector-stage {
     width: min(96vw, 56vh);
+  }
+}
+
+@media (max-width: 420px) {
+  .dialog-actions.actions-3 {
+    grid-template-columns: 1fr;
   }
 }
 

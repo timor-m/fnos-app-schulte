@@ -17,41 +17,55 @@ import {
   MAX_LEVEL,
   buildLevel,
   canonicalSeed,
+  layoutUnlockAfter,
   levelBand,
   randomSeed,
   shapeName,
-  timeLimitForLevel,
-  type CellSkin
+  type CellSpec,
+  type Ruleset
 } from "../game/levels";
 import {
   bestTime,
   loadProgress,
+  markLayoutUnlockSeen,
   saveProgress,
   saveRecord,
+  seenLayoutUnlocks,
   type GameSettings
 } from "../game/storage";
 import { formatCountdown, formatElapsed } from "../game/format";
-import { playComplete, playError, playFail, playTap } from "../game/sound";
+import {
+  preloadAudio,
+  playComplete,
+  playError,
+  playFail,
+  playStart,
+  playTap,
+  unlockAudio
+} from "../game/sound";
 import { submitRecord } from "../game/api";
 import CompleteDialog from "../components/CompleteDialog.vue";
 import FailDialog from "../components/FailDialog.vue";
+import BoardRenderer from "../components/BoardRenderer.vue";
+import LayoutUnlockDialog from "../components/LayoutUnlockDialog.vue";
 
 const props = defineProps<{
   level: number;
   seed: number | null;
-  shareUrl: (level: number, seed: number | null) => string;
+  ruleset: Ruleset;
+  shareUrl: (level: number, seed: number | null, ruleset: Ruleset) => string;
 }>();
 
 const emit = defineEmits<{
   (e: "exit"): void;
-  (e: "navigate", level: number): void;
+  (e: "navigate", level: number, ruleset: Ruleset): void;
   (e: "seed-change", seed: number): void;
 }>();
 
 const settings = inject<GameSettings>("settings")!;
 
-const currentSeed = ref(props.seed ?? canonicalSeed(props.level));
-const spec = ref(buildLevel(props.level, currentSeed.value));
+const currentSeed = ref(props.seed ?? canonicalSeed(props.level, props.ruleset));
+const spec = ref(buildLevel(props.level, currentSeed.value, props.ruleset));
 
 const target = ref(1);
 const errors = ref(0);
@@ -61,78 +75,28 @@ const paused = ref(false);
 const finished = ref(false);
 const failed = ref(false);
 const isNewBest = ref(false);
-const wrongIndex = ref(-1);
+const wrongId = ref<string | null>(null);
 const shared = ref(false);
+const unlockOpen = ref(false);
 
 let timer: number | null = null;
 let startedAt = 0;
 let accumulated = 0;
+let tapSoundFrame: number | null = null;
+let pendingTapSound = 0;
 
-const best = ref<number | null>(bestTime(props.level));
-const timeLimit = timeLimitForLevel(props.level);
+const best = ref<number | null>(bestTime(props.level, props.ruleset));
+const timeLimit = spec.value.timeLimitMs;
 
-const size = computed(() => spec.value.size);
-const total = computed(() => spec.value.cells.length);
+const total = computed(() => spec.value.targetCount);
 const shapeLabel = computed(() => shapeName(spec.value.shape));
 const progressRatio = computed(() => ((target.value - 1) / total.value) * 100);
-const doneSet = computed(() => new Set(Array.from({ length: target.value - 1 }, (_, i) => i + 1)));
 
 const remaining = computed(() => (timeLimit === null ? null : Math.max(0, timeLimit - elapsed.value)));
 const timeCritical = computed(() => remaining.value !== null && remaining.value <= 10000 && started.value && !finished.value && !failed.value);
 
 /** 就绪态：未开始、未结束、未失败时遮罩盖住棋盘，点击开始才计时 */
 const ready = computed(() => !started.value && !finished.value && !failed.value);
-
-// ---- 蜂巢 SVG 几何：尖顶六边形无缝拼接，行间距精确为 3/4 高度 ----
-
-const HEX_W = 100;
-const HEX_H = (HEX_W * 2) / Math.sqrt(3);
-const HEX_STEP_Y = HEX_H * 0.75;
-
-const hexViewBox = computed(() => {
-  const width = size.value * HEX_W + HEX_W / 2;
-  const height = (size.value - 1) * HEX_STEP_Y + HEX_H;
-  return `0 0 ${width} ${height}`;
-});
-
-function hexPoints(index: number): string {
-  const r = Math.floor(index / size.value);
-  const c = index % size.value;
-  const cx = HEX_W / 2 + c * HEX_W + (r % 2 === 1 ? HEX_W / 2 : 0);
-  const cy = HEX_H / 2 + r * HEX_STEP_Y;
-  return [
-    [cx, cy - HEX_H / 2],
-    [cx + HEX_W / 2, cy - HEX_H / 4],
-    [cx + HEX_W / 2, cy + HEX_H / 4],
-    [cx, cy + HEX_H / 2],
-    [cx - HEX_W / 2, cy + HEX_H / 4],
-    [cx - HEX_W / 2, cy - HEX_H / 4]
-  ]
-    .map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`)
-    .join(" ");
-}
-
-function hexCenter(index: number): { x: number; y: number } {
-  const r = Math.floor(index / size.value);
-  const c = index % size.value;
-  return {
-    x: HEX_W / 2 + c * HEX_W + (r % 2 === 1 ? HEX_W / 2 : 0),
-    y: HEX_H / 2 + r * HEX_STEP_Y
-  };
-}
-
-function gridCellStyle(cell: CellSkin) {
-  return {
-    width: `${cell.widthPct}%`,
-    height: `${cell.heightPct}%`,
-    justifySelf: cell.placeH,
-    alignSelf: cell.placeV,
-    borderRadius: `${cell.radius}px`,
-    background: cell.bg,
-    color: cell.color,
-    fontSize: `${cell.fontScale}em`
-  };
-}
 
 // ---- 计时 ----
 
@@ -151,6 +115,8 @@ function startTimer() {
 }
 
 function begin() {
+  if (settings.sound) unlockAudio();
+  if (settings.sound) safeSound(playStart);
   startTimer();
 }
 
@@ -162,28 +128,66 @@ function stopTimer() {
 }
 
 function vibrate(pattern: number | number[]) {
-  if (settings.haptics && "vibrate" in navigator) {
-    navigator.vibrate(pattern);
+  try {
+    if (settings.haptics && "vibrate" in navigator) {
+      navigator.vibrate(pattern);
+    }
+  } catch {
+    // 触觉反馈失败不影响游戏
   }
 }
 
-function tapCell(value: number, index: number) {
+function safeSound(play: () => void) {
+  // 音效必须在状态更新之后调用，且任何异常都不能吞掉这次点按
+  if (!settings.sound) return;
+  try {
+    play();
+  } catch {
+    // 音频上下文不可用时静默降级
+  }
+}
+
+function queueTapSound(step: number) {
+  if (!settings.sound) return;
+  pendingTapSound = step;
+  if (tapSoundFrame !== null) return;
+  tapSoundFrame = window.requestAnimationFrame(() => {
+    tapSoundFrame = null;
+    safeSound(() => playTap(pendingTapSound));
+  });
+}
+
+function cancelTapSound() {
+  if (tapSoundFrame !== null) window.cancelAnimationFrame(tapSoundFrame);
+  tapSoundFrame = null;
+}
+
+function markWrong(cell: CellSpec) {
+  errors.value += 1;
+  wrongId.value = cell.id;
+  safeSound(playError);
+  vibrate(30);
+  window.setTimeout(() => {
+    if (wrongId.value === cell.id) wrongId.value = null;
+  }, 350);
+}
+
+function tapCell(cell: CellSpec) {
   if (!started.value || paused.value || finished.value || failed.value) return;
 
-  if (value === target.value) {
-    if (settings.sound) playTap(target.value);
+  if (cell.kind === "distractor") {
+    markWrong(cell);
+    return;
+  }
+
+  if (cell.sequenceValue === target.value) {
     target.value += 1;
+    queueTapSound(target.value - 1);
     if (target.value > total.value) {
       finish();
     }
-  } else if (!doneSet.value.has(value)) {
-    errors.value += 1;
-    wrongIndex.value = index;
-    if (settings.sound) playError();
-    vibrate(30);
-    window.setTimeout(() => {
-      if (wrongIndex.value === index) wrongIndex.value = -1;
-    }, 350);
+  } else if ((cell.sequenceValue ?? 0) > target.value) {
+    markWrong(cell);
   }
 }
 
@@ -191,16 +195,17 @@ function finish() {
   accumulated = elapsed.value;
   stopTimer();
   finished.value = true;
-  if (settings.sound) playComplete();
+  cancelTapSound();
+  safeSound(playComplete);
   vibrate(60);
 
   const ms = Math.round(elapsed.value);
   // 本地先记录保证界面即时反馈，同时上报服务器（排行榜与个人档案）
-  const localBest = saveRecord(props.level, ms);
+  const localBest = saveRecord(props.level, ms, props.ruleset);
   isNewBest.value = localBest;
-  best.value = bestTime(props.level);
+  best.value = bestTime(props.level, props.ruleset);
 
-  void submitRecord({ level: props.level, ms, errors: errors.value, seed: currentSeed.value }).then((res) => {
+  void submitRecord({ level: props.level, ms, errors: errors.value, seed: currentSeed.value, ruleset: props.ruleset }).then((res) => {
     if (res) {
       isNewBest.value = res.isNewBest;
       best.value = res.best;
@@ -208,8 +213,8 @@ function finish() {
   });
 
   // 通关后推进进度（只前进，不回退）
-  if (props.level > loadProgress()) {
-    saveProgress(props.level);
+  if (props.level > loadProgress(props.ruleset)) {
+    saveProgress(props.level, props.ruleset);
   }
 }
 
@@ -217,7 +222,8 @@ function fail() {
   accumulated = elapsed.value;
   stopTimer();
   failed.value = true;
-  if (settings.sound) playFail();
+  cancelTapSound();
+  safeSound(playFail);
   vibrate([60, 40, 60]);
 }
 
@@ -236,6 +242,7 @@ function togglePause() {
 
 function resetState() {
   stopTimer();
+  cancelTapSound();
   target.value = 1;
   errors.value = 0;
   elapsed.value = 0;
@@ -244,7 +251,7 @@ function resetState() {
   paused.value = false;
   finished.value = false;
   failed.value = false;
-  wrongIndex.value = -1;
+  wrongId.value = null;
 }
 
 /** 重新开始：方案不变，只清零进度 */
@@ -255,14 +262,15 @@ function restart() {
 /** 重新排版：换一套排布与配色（新种子），并同步到地址栏便于分享 */
 function refreshLayout() {
   currentSeed.value = randomSeed();
-  spec.value = buildLevel(props.level, currentSeed.value);
+  spec.value = buildLevel(props.level, currentSeed.value, props.ruleset);
   resetState();
   emit("seed-change", currentSeed.value);
 }
 
 async function share() {
-  const url = props.shareUrl(props.level, currentSeed.value);
-  const text = `我在「舒尔特训练」第 ${props.level} 关（${shapeLabel.value} ${size.value}×${size.value}）等你挑战：${url}`;
+  const url = props.shareUrl(props.level, currentSeed.value, props.ruleset);
+  const distractorText = spec.value.distractorCount > 0 ? ` + ${spec.value.distractorCount} 个字母干扰` : "";
+  const text = `我在「舒尔特训练」第 ${props.level} 关（${shapeLabel.value}，${total.value} 个数字${distractorText}）等你挑战：${url}`;
   try {
     await navigator.clipboard.writeText(text);
     shared.value = true;
@@ -274,8 +282,26 @@ async function share() {
 
 function nextLevel() {
   if (props.level < MAX_LEVEL) {
-    emit("navigate", props.level + 1);
+    const unlock = props.ruleset === "v3" ? layoutUnlockAfter(props.level) : null;
+    if (unlock && !seenLayoutUnlocks().has(unlock.level)) {
+      unlockOpen.value = true;
+      return;
+    }
+    emit("navigate", props.level + 1, props.ruleset);
   }
+}
+
+function playUnlockedLayout() {
+  const unlock = layoutUnlockAfter(props.level);
+  if (!unlock) return;
+  markLayoutUnlockSeen(unlock.level);
+  emit("navigate", unlock.level, props.ruleset);
+}
+
+function deferUnlockedLayout() {
+  const unlock = layoutUnlockAfter(props.level);
+  if (unlock) markLayoutUnlockSeen(unlock.level);
+  emit("exit");
 }
 
 function onKeydown(event: KeyboardEvent) {
@@ -285,9 +311,14 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
-onMounted(() => window.addEventListener("keydown", onKeydown));
+onMounted(() => {
+  // 进入对局页即开始加载音效资源，点击开始时只负责解锁与播放。
+  if (settings.sound) preloadAudio();
+  window.addEventListener("keydown", onKeydown);
+});
 onBeforeUnmount(() => {
   stopTimer();
+  cancelTapSound();
   window.removeEventListener("keydown", onKeydown);
 });
 </script>
@@ -301,7 +332,11 @@ onBeforeUnmount(() => {
         </button>
         <div class="hud-title">
           <strong>第 {{ level }} 关 · {{ shapeLabel }}</strong>
-          <small>{{ levelBand(level) }} · {{ size }}×{{ size }}<template v-if="timeLimit !== null"> · 限时</template></small>
+          <small>
+            {{ levelBand(level) }} · {{ total }} 个数字
+            <template v-if="spec.distractorCount"> + {{ spec.distractorCount }} 干扰</template>
+            <template v-if="timeLimit !== null"> · 限时</template>
+          </small>
         </div>
       </div>
 
@@ -347,71 +382,22 @@ onBeforeUnmount(() => {
     </div>
 
     <section class="board-wrap">
-      <!-- 错落方格 -->
-      <div
-        v-if="spec.shape === 'grid'"
-        class="board grid-board"
-        :class="{ dimmed: paused }"
-        :style="{ '--k': size }"
-      >
-        <button
-          v-for="(cell, index) in spec.cells"
-          :key="index"
-          type="button"
-          class="cell"
-          :class="{ wrong: wrongIndex === index }"
-          :style="gridCellStyle(cell)"
-          :disabled="!started || paused"
-          @pointerdown="tapCell(cell.value, index)"
-        >
-          {{ cell.value }}
-        </button>
+      <div class="board-shell">
+        <BoardRenderer
+          :spec="spec"
+          :active="started"
+          :paused="paused"
+          :wrong-id="wrongId"
+          @select="tapCell"
+        />
         <div v-if="ready" class="ready-mask">
-          <p class="ready-title">第 {{ level }} 关 · {{ shapeLabel }} {{ size }}×{{ size }}</p>
+          <p class="ready-title">第 {{ level }} 关 · {{ shapeLabel }}</p>
           <p v-if="timeLimit !== null" class="ready-limit"><Timer :size="13" />限时 {{ formatCountdown(timeLimit) }}</p>
           <button type="button" class="start-btn" @click="begin"><Play :size="18" fill="currentColor" />开始</button>
-          <p class="ready-hint">点击开始即计时，按 1 到 {{ total }} 依次点按</p>
-        </div>
-        <div v-if="paused" class="pause-mask">
-          <p>已暂停</p>
-          <button type="button" class="resume-btn" @click="togglePause"><Play :size="16" fill="currentColor" />继续</button>
-        </div>
-      </div>
-
-      <!-- 蜂巢：整张棋盘一个 SVG，几何精确、无缝无叠 -->
-      <div v-else class="board hex-stage" :class="{ dimmed: paused }">
-        <svg class="hex-svg" :viewBox="hexViewBox" role="group" aria-label="蜂巢棋盘">
-          <g
-            v-for="(cell, index) in spec.cells"
-            :key="index"
-            class="hex-g"
-            :class="{ wrong: wrongIndex === index }"
-            role="button"
-            :aria-label="`数字 ${cell.value}`"
-            @pointerdown="tapCell(cell.value, index)"
-          >
-            <polygon
-              class="hex-poly"
-              :class="{ wrong: wrongIndex === index }"
-              :points="hexPoints(index)"
-              :fill="cell.bg"
-            />
-            <text
-              class="hex-text"
-              :x="hexCenter(index).x"
-              :y="hexCenter(index).y"
-              :fill="cell.color"
-              :font-size="34 * cell.fontScale"
-            >
-              {{ cell.value }}
-            </text>
-          </g>
-        </svg>
-        <div v-if="ready" class="ready-mask">
-          <p class="ready-title">第 {{ level }} 关 · {{ shapeLabel }} {{ size }}×{{ size }}</p>
-          <p v-if="timeLimit !== null" class="ready-limit"><Timer :size="13" />限时 {{ formatCountdown(timeLimit) }}</p>
-          <button type="button" class="start-btn" @click="begin"><Play :size="18" fill="currentColor" />开始</button>
-          <p class="ready-hint">点击开始即计时，按 1 到 {{ total }} 依次点按</p>
+          <p class="ready-hint">
+            按 1 到 {{ total }} 依次点按
+            <template v-if="spec.distractorCount">，忽略 {{ spec.distractorCount }} 个字母</template>
+          </p>
         </div>
         <div v-if="paused" class="pause-mask">
           <p>已暂停</p>
@@ -421,9 +407,11 @@ onBeforeUnmount(() => {
     </section>
 
     <CompleteDialog
-      v-if="finished"
+      v-if="finished && !unlockOpen"
       :level="level"
       :shape="spec.shape"
+      :ruleset="ruleset"
+      :target-count="spec.targetCount"
       :seed="currentSeed"
       :time-ms="Math.round(elapsed)"
       :errors="errors"
@@ -434,6 +422,13 @@ onBeforeUnmount(() => {
       @next="nextLevel"
       @replay="restart"
       @home="emit('exit')"
+    />
+
+    <LayoutUnlockDialog
+      v-if="unlockOpen && layoutUnlockAfter(level)"
+      :unlock="layoutUnlockAfter(level)!"
+      @play="playUnlockedLayout"
+      @later="deferUnlockedLayout"
     />
 
     <FailDialog

@@ -88,7 +88,7 @@ npm run pack:fpk
 构建产物：
 
 - `dist/app.tgz`
-- `dist/*.fpk`
+- `dist/fnos-app-schulte-<version>.fpk`
 - `.fnos-build/package/`，用于排查最终包内容
 
 ## 设备测试
@@ -96,7 +96,7 @@ npm run pack:fpk
 手动测试可从应用中心选择 `.fpk` 安装。脚本化测试在 fnOS 设备执行：
 
 ```bash
-appcenter-cli install-fpk fnos-app-schulte.fpk
+appcenter-cli install-fpk fnos-app-schulte-<version>.fpk
 appcenter-cli start fnos-app-schulte
 appcenter-cli list
 ```

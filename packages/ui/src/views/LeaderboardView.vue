@@ -7,14 +7,15 @@ import {
   type LevelEntry,
   type OverallEntry
 } from "../game/api";
-import { MAX_LEVEL, gridSizeForLevel, shapeForLevel, shapeName } from "../game/levels";
+import { MAX_LEVEL, levelProfileForLevel, shapeName, type Ruleset } from "../game/levels";
 import { formatElapsed } from "../game/format";
 
 const emit = defineEmits<{
-  (e: "play", level: number): void;
+  (e: "play", level: number, ruleset: Ruleset): void;
 }>();
 
 const scope = ref<"overall" | "level">("overall");
+const ruleset = ref<Ruleset>("v3");
 const level = ref(1);
 const loading = ref(true);
 const overall = ref<OverallEntry[]>([]);
@@ -37,16 +38,16 @@ function initial(username: string): string {
 async function load() {
   loading.value = true;
   if (scope.value === "overall") {
-    const data = await fetchOverallBoard();
+    const data = await fetchOverallBoard(ruleset.value);
     overall.value = data?.entries ?? [];
   } else {
-    const data = await fetchLevelBoard(level.value);
+    const data = await fetchLevelBoard(level.value, ruleset.value);
     levelEntries.value = data?.entries ?? [];
   }
   loading.value = false;
 }
 
-watch([scope, level], () => void load());
+watch([scope, level, ruleset], () => void load());
 onMounted(() => void load());
 </script>
 
@@ -58,6 +59,10 @@ onMounted(() => void load());
         <p>同一屋檐下的专注力较量</p>
       </div>
       <div class="board-controls">
+        <div class="scope-tabs version-tabs" aria-label="规则版本">
+          <button type="button" :class="{ active: ruleset === 'v3' }" @click="ruleset = 'v3'">当前版</button>
+          <button type="button" :class="{ active: ruleset === 'v2' }" @click="ruleset = 'v2'">经典版</button>
+        </div>
         <div class="scope-tabs" role="tablist">
           <button type="button" :class="{ active: scope === 'overall' }" @click="scope = 'overall'">总榜</button>
           <button type="button" :class="{ active: scope === 'level' }" @click="scope = 'level'">单关榜</button>
@@ -116,8 +121,12 @@ onMounted(() => void load());
     <!-- 单关榜 -->
     <template v-else>
       <p class="level-board-meta">
-        第 {{ level }} 关 · {{ shapeName(shapeForLevel(level)) }} {{ gridSizeForLevel(level) }}×{{ gridSizeForLevel(level) }}
-        <button type="button" class="mini-play" @click="emit('play', level)"><Play :size="13" fill="currentColor" />去挑战</button>
+        第 {{ level }} 关 · {{ shapeName(levelProfileForLevel(level, ruleset).shape) }} ·
+        {{ levelProfileForLevel(level, ruleset).targetCount }} 个数字
+        <template v-if="levelProfileForLevel(level, ruleset).distractorCount">
+          + {{ levelProfileForLevel(level, ruleset).distractorCount }} 字母
+        </template>
+        <button type="button" class="mini-play" @click="emit('play', level, ruleset)"><Play :size="13" fill="currentColor" />去挑战</button>
       </p>
       <div v-if="levelEntries.length === 0" class="board-empty">
         <p>这一关还没有成绩</p>

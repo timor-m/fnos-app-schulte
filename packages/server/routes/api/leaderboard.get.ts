@@ -2,6 +2,7 @@ import { defineEventHandler, getQuery } from "h3";
 import { ok } from "../../utils/api-response";
 import { getIdentity } from "../../utils/identity";
 import { getDb } from "../../services/db";
+import { isRuleset } from "../../../shared/levels";
 
 /**
  * 家庭排行榜：
@@ -11,6 +12,7 @@ import { getDb } from "../../services/db";
 export default defineEventHandler((event) => {
   const identity = getIdentity(event);
   const query = getQuery(event);
+  const ruleset = isRuleset(query.ruleset) ? query.ruleset : "v3";
   const db = getDb();
 
   if (query.level !== undefined) {
@@ -18,13 +20,13 @@ export default defineEventHandler((event) => {
     const rows = db
       .prepare(
         `SELECT u.uid, u.username, b.best_ms AS bestMs, b.plays, b.updated_at AS updatedAt
-         FROM bests b JOIN users u ON u.uid = b.uid
-         WHERE b.level = ?
+         FROM bests_rulesets b JOIN users u ON u.uid = b.uid
+         WHERE b.ruleset = ? AND b.level = ?
          ORDER BY b.best_ms ASC
          LIMIT 50`
       )
-      .all(level) as Array<Record<string, unknown>>;
-    return ok({ scope: "level", level, entries: withRank(rows, identity.uid) });
+      .all(ruleset, level) as Array<Record<string, unknown>>;
+    return ok({ scope: "level", level, ruleset, entries: withRank(rows, identity.uid) });
   }
 
   const rows = db
@@ -36,14 +38,14 @@ export default defineEventHandler((event) => {
               COALESCE(SUM(b.best_ms), 0) AS totalBestMs,
               MAX(b.updated_at) AS lastActive
        FROM users u
-       LEFT JOIN bests b ON b.uid = u.uid
+       JOIN bests_rulesets b ON b.uid = u.uid AND b.ruleset = ?
        GROUP BY u.uid
        ORDER BY completed DESC, avgBestMs ASC
        LIMIT 50`
     )
-    .all() as Array<Record<string, unknown>>;
+    .all(ruleset) as Array<Record<string, unknown>>;
 
-  return ok({ scope: "overall", entries: withRank(rows, identity.uid) });
+  return ok({ scope: "overall", ruleset, entries: withRank(rows, identity.uid) });
 });
 
 function withRank(rows: Array<Record<string, unknown>>, currentUid: string) {

@@ -16,12 +16,17 @@ jobs:
       - run: npm ci
       - run: npm run download:fnpack
       - run: npm run pack:fpk
-      - name: Upload app.tgz artifact
+      - name: Read package metadata
+        id: package
+        run: |
+          echo "name=$(node -p 'require("./package.json").name')" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
+      - name: Upload versioned package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: fnos-app-schulte-artifacts
+          name: ${{ steps.package.outputs.name }}-${{ steps.package.outputs.version }}
           path: |
             dist/app.tgz
-            dist/*.fpk
+            dist/${{ steps.package.outputs.name }}-${{ steps.package.outputs.version }}.fpk
             .fnos-build/package/manifest
           if-no-files-found: error

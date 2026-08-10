@@ -33,11 +33,15 @@ jobs:
         id: meta
         run: |
           echo "title=$(node -p 'require("./template.config.json").appTitle')" >> "$GITHUB_OUTPUT"
+          echo "package_name=$(node -p 'require("./package.json").name')" >> "$GITHUB_OUTPUT"
+          echo "package_version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
+          echo "package_file=$(node -p 'const p=require("./package.json"); `${p.name}-${p.version}.fpk`')" >> "$GITHUB_OUTPUT"
 
       - name: Prepare release notes
         shell: bash
         env:
           VERSION: ${{ github.ref_name }}
+          PACKAGE_FILE: ${{ steps.meta.outputs.package_file }}
         run: |
           node -e '
             const fs = require("fs");
@@ -57,7 +61,7 @@ jobs:
               "## Release Artifacts",
               "",
               "- `dist/app.tgz`: fnOS app payload archive",
-              "- `dist/*.fpk`: installable fnOS package",
+              `- \`dist/${process.env.PACKAGE_FILE}\`: installable fnOS package`,
               "",
               "## Notes",
               "",
@@ -76,4 +80,4 @@ jobs:
           body_path: RELEASE_NOTES.md
           files: |
             dist/app.tgz
-            dist/*.fpk
+            dist/${{ steps.meta.outputs.package_file }}
