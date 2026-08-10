@@ -15,11 +15,14 @@ import appIcon from "./assets/app-icon.png";
 type GameLocation = { level: number; seed: number | null; ruleset: Ruleset };
 type GameTarget = GameLocation & { autoStart: boolean };
 type View = "home" | "leaderboard" | "me" | "game";
+type LeaderboardState = { scope: "overall" | "level"; level: number };
 
 const view = ref<View>("home");
 const target = ref<GameTarget>({ level: 1, seed: null, ruleset: "v3", autoStart: false });
 const username = ref<string | null>(null);
 const settingsOpen = ref(false);
+const leaderboardState = reactive<LeaderboardState>({ scope: "overall", level: 1 });
+const gameReturn = ref<LeaderboardState | null>(null);
 
 const settings = reactive<GameSettings>({ ...DEFAULT_SETTINGS, ...loadSettings() });
 
@@ -42,13 +45,43 @@ function openGame(
   syncUrl(target.value);
 }
 
-function goHome() {
-  view.value = "home";
+function openDefaultGame(level: number) {
+  gameReturn.value = null;
+  openGame(level);
+}
+
+function openLeaderboardGame(level: number) {
+  gameReturn.value = { ...leaderboardState };
+  openGame(level);
+}
+
+function updateLeaderboardState(scope: LeaderboardState["scope"], level: number) {
+  leaderboardState.scope = scope;
+  leaderboardState.level = level;
+}
+
+function clearGameUrl() {
   const url = new URL(window.location.href);
   if (url.search) {
     url.search = "";
     window.history.replaceState(null, "", url.toString());
   }
+}
+
+function goHome() {
+  view.value = "home";
+  clearGameUrl();
+}
+
+function returnFromGame() {
+  if (gameReturn.value) {
+    updateLeaderboardState(gameReturn.value.scope, gameReturn.value.level);
+    view.value = "leaderboard";
+    clearGameUrl();
+    gameReturn.value = null;
+    return;
+  }
+  goHome();
 }
 
 function goTab(tab: Exclude<View, "game">) {
@@ -121,9 +154,15 @@ onMounted(async () => {
       </div>
     </header>
 
-    <HomeView v-if="view === 'home'" @start="openGame" />
-    <LeaderboardView v-else-if="view === 'leaderboard'" @play="openGame" />
-    <ProfileView v-else-if="view === 'me'" @play="openGame" />
+    <HomeView v-if="view === 'home'" @start="openDefaultGame" />
+    <LeaderboardView
+      v-else-if="view === 'leaderboard'"
+      :initial-scope="leaderboardState.scope"
+      :initial-level="leaderboardState.level"
+      @play="openLeaderboardGame"
+      @state-change="updateLeaderboardState"
+    />
+    <ProfileView v-else-if="view === 'me'" @play="openDefaultGame" />
     <GameView
       v-else
       :key="`${target.ruleset}:${target.level}:${target.seed ?? 'canon'}`"
@@ -131,8 +170,10 @@ onMounted(async () => {
       :seed="target.seed"
       :ruleset="target.ruleset"
       :auto-start="target.autoStart"
+      :return-to-previous="gameReturn !== null"
       :share-url="shareUrl"
       @exit="goHome"
+      @return="returnFromGame"
       @navigate="openGame"
       @seed-change="(s) => syncUrl({ level: target.level, seed: s, ruleset: target.ruleset })"
     />

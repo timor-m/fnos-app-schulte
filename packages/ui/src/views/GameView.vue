@@ -16,7 +16,6 @@ import {
 import {
   MAX_LEVEL,
   buildLevel,
-  canonicalSeed,
   layoutUnlockAfter,
   levelBand,
   randomSeed,
@@ -54,18 +53,21 @@ const props = defineProps<{
   seed: number | null;
   ruleset: Ruleset;
   autoStart: boolean;
+  returnToPrevious: boolean;
   shareUrl: (level: number, seed: number | null, ruleset: Ruleset) => string;
 }>();
 
 const emit = defineEmits<{
   (e: "exit"): void;
+  (e: "return"): void;
   (e: "navigate", level: number, ruleset: Ruleset, seed: number | null, autoStart: boolean): void;
   (e: "seed-change", seed: number): void;
 }>();
 
 const settings = inject<GameSettings>("settings")!;
 
-const currentSeed = ref(props.seed ?? canonicalSeed(props.level, props.ruleset));
+// Normal entry gets a fresh board; an explicit seed still reproduces a specific arrangement.
+const currentSeed = ref(props.seed ?? randomSeed());
 const spec = ref(buildLevel(props.level, currentSeed.value, props.ruleset));
 
 const target = ref(1);
@@ -412,18 +414,16 @@ onBeforeUnmount(() => {
       v-if="finished && !unlockOpen"
       :level="level"
       :shape="spec.shape"
-      :ruleset="ruleset"
       :target-count="spec.targetCount"
-      :seed="currentSeed"
       :time-ms="Math.round(elapsed)"
       :errors="errors"
       :best="best"
       :is-new-best="isNewBest"
       :has-next="level < MAX_LEVEL"
-      :share-url="shareUrl"
+      :return-to-previous="returnToPrevious"
       @next="nextLevel"
       @replay="restart"
-      @home="emit('exit')"
+      @home="emit('return')"
     />
 
     <LayoutUnlockDialog

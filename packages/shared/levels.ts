@@ -257,6 +257,16 @@ export function timeLimitForLevel(
     const perCellMs = Math.max(850, 1750 - (level - TIMED_FROM_LEVEL) * 2.2);
     return Math.round(targetCount * perCellMs);
   }
-  const perTargetMs = level < 200 ? 1800 : level <= 300 ? 1600 : level <= 400 ? 1500 : 1400;
+  const perTargetMs = level <= 120
+    ? 2400
+    : level <= 150
+      ? 2200
+      : level < 200
+        ? 2000
+        : level <= 300
+          ? 1600
+          : level <= 400
+            ? 1500
+            : 1400;
   return Math.round(targetCount * perTargetMs * SHAPE_TIME_FACTORS[shape]);
 }

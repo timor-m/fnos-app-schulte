@@ -1,25 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import {
-  CircleDot,
-  Diamond,
-  Fan,
-  Flower2,
-  Grid3x3,
-  Hexagon,
-  Orbit,
-  Play,
-  RectangleHorizontal,
-  Route,
-  Shell,
-  Sparkles,
-  TrendingUp,
-  Triangle,
-  Waves
-} from "lucide-vue-next";
+import { Play, TrendingUp } from "lucide-vue-next";
 import { fetchMe, fetchMyPlays, type MeData, type PlayItem } from "../game/api";
-import { firstPlayableLevel, shapeForLevel, type BoardShape } from "../game/levels";
+import { firstPlayableLevel, shapeForLevel } from "../game/levels";
 import { formatElapsed } from "../game/format";
+import ShapeIcon from "../components/ShapeIcon.vue";
 
 const emit = defineEmits<{
   (e: "play", level: number): void;
@@ -35,22 +20,6 @@ const loadingMore = ref(false);
 const loadError = ref(false);
 const sentinel = ref<HTMLElement | null>(null);
 let observer: IntersectionObserver | null = null;
-
-const shapeIcons: Record<BoardShape, typeof Grid3x3> = {
-  grid: Grid3x3,
-  hex: Hexagon,
-  radial: CircleDot,
-  spiral: Shell,
-  scatter: Sparkles,
-  triangle: Triangle,
-  wave: Waves,
-  fan: Fan,
-  orbit: Orbit,
-  diamond: Diamond,
-  petal: Flower2,
-  track: RectangleHorizontal,
-  snake: Route
-};
 
 async function loadProfile() {
   loading.value = true;
@@ -193,7 +162,7 @@ function relativeTime(ts: number): string {
         <div v-else class="play-list">
           <div v-for="play in plays" :key="play.id" class="play-row">
             <span class="play-shape">
-              <component :is="shapeIcons[shapeForLevel(play.level)]" :size="16" aria-hidden="true" />
+              <ShapeIcon :shape="shapeForLevel(play.level)" :size="16" />
             </span>
             <span class="play-level">第 {{ play.level }} 关</span>
             <span class="play-ms mono">{{ formatElapsed(play.ms) }}</span>

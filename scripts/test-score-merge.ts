@@ -32,10 +32,10 @@ database.exec(`
 `);
 
 assert.deepEqual(
-  mergedRecordsForUser(database, "a").map(({ level, bestMs, plays }) => ({ level, bestMs, plays })),
+  mergedRecordsForUser(database, "a"),
   [
-    { level: 1, bestMs: 10000, plays: 5 },
-    { level: 2, bestMs: 15000, plays: 1 }
+    { level: 1, bestMs: 10000, plays: 5, isFastest: false },
+    { level: 2, bestMs: 15000, plays: 1, isFastest: true }
   ]
 );
 assert.deepEqual({ ...mergedBestForLevel(database, "a", 1) }, { bestMs: 10000, plays: 5 });

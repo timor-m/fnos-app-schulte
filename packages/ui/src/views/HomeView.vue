@@ -1,24 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import {
-  Check,
-  CircleDot,
-  Diamond,
-  Fan,
-  Flower2,
-  Grid3x3,
-  Hexagon,
-  Lock,
-  Orbit,
-  Play,
-  RectangleHorizontal,
-  Route,
-  Shell,
-  Sparkles,
-  Timer,
-  Triangle,
-  Waves
-} from "lucide-vue-next";
+import { Lock, Medal, Play, Timer } from "lucide-vue-next";
 import {
   LEVEL_BANDS,
   MAX_LEVEL,
@@ -40,7 +22,8 @@ import {
 import { formatElapsed } from "../game/format";
 import { fetchMe } from "../game/api";
 import LayoutUnlockDialog from "../components/LayoutUnlockDialog.vue";
-import type { BoardShape, LayoutUnlock } from "../game/levels";
+import ShapeIcon from "../components/ShapeIcon.vue";
+import type { LayoutUnlock } from "../game/levels";
 
 const emit = defineEmits<{
   (e: "start", level: number): void;
@@ -49,23 +32,8 @@ const emit = defineEmits<{
 const progress = ref(0);
 const doneCount = ref(0);
 const serverBests = ref<Map<number, number>>(new Map());
+const fastestLevels = ref<Set<number>>(new Set());
 const missedUnlock = ref<LayoutUnlock | null>(null);
-
-const shapeIcons: Record<BoardShape, typeof Grid3x3> = {
-  grid: Grid3x3,
-  hex: Hexagon,
-  radial: CircleDot,
-  spiral: Shell,
-  scatter: Sparkles,
-  triangle: Triangle,
-  wave: Waves,
-  fan: Fan,
-  orbit: Orbit,
-  diamond: Diamond,
-  petal: Flower2,
-  track: RectangleHorizontal,
-  snake: Route
-};
 
 onMounted(async () => {
   progress.value = loadProgress();
@@ -74,6 +42,7 @@ onMounted(async () => {
   const me = await fetchMe();
   if (me) {
     serverBests.value = new Map(me.records.map((r) => [r.level, r.bestMs]));
+    fastestLevels.value = new Set(me.records.filter((r) => r.isFastest).map((r) => r.level));
     doneCount.value = me.summary.completed;
     progress.value = Math.max(progress.value, ...me.records.map((r) => r.level), 0);
   }
@@ -105,6 +74,7 @@ const levels = computed(() =>
       shape,
       shapeLabel: shapeName(shape),
       best,
+      isFastest: fastestLevels.value.has(level),
       done: best !== null,
       locked: !isLevelUnlocked(level, doneLevels.value)
     };
@@ -210,7 +180,7 @@ onBeforeUnmount(() => {
       <button class="continue-btn" type="button" @click="emit('start', nextLevel)">
         <span class="continue-label"><Play :size="17" fill="currentColor" />{{ doneCount > 0 ? "继续训练" : "开始训练" }}</span>
         <span class="continue-level">
-          第 {{ nextLevel }} 关 · {{ shapeName(nextProfile.shape) }} · {{ nextProfile.targetCount }} 个数字
+          第 {{ nextLevel }} 关 · <ShapeIcon :shape="nextProfile.shape" :size="14" /> {{ nextProfile.targetCount }} 个数字
           <template v-if="nextProfile.distractorCount"> + {{ nextProfile.distractorCount }} 字母</template>
         </span>
       </button>
@@ -259,14 +229,17 @@ onBeforeUnmount(() => {
         >
           <span class="lc-top">
             <span class="level-num">{{ item.level }}</span>
-            <component :is="shapeIcons[item.shape]" :size="13" class="lc-shape" />
+            <ShapeIcon :shape="item.shape" :size="13" class="lc-shape" />
           </span>
           <span class="lc-bottom">
             <template v-if="item.locked">
               <Lock :size="11" />
             </template>
             <template v-else-if="item.done">
-              <Check :size="11" class="lc-check" />{{ formatElapsed(item.best!) }}
+              <span class="lc-result">{{ formatElapsed(item.best!) }}</span>
+              <span v-if="item.isFastest" class="lc-fastest" title="我的成绩为本关最快" aria-label="本关最快">
+                <Medal :size="14" :stroke-width="2.2" />
+              </span>
             </template>
             <template v-else>
               {{ item.targetCount }} 数字
@@ -278,7 +251,7 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <p class="home-tip">1-{{ SEQUENTIAL_FROM_LEVEL - 1 }} 关全部开放，{{ SEQUENTIAL_FROM_LEVEL }} 关起需逐关通关解锁；同一关的排布与配色默认固定，分享链接可直接挑战同一局面。</p>
+    <p class="home-tip">1-{{ SEQUENTIAL_FROM_LEVEL - 1 }} 关全部开放，{{ SEQUENTIAL_FROM_LEVEL }} 关起需逐关通关解锁；同一关每次进入会生成新的排布与配色。</p>
 
     <div v-if="lockTip" class="toast" role="status"><Lock :size="14" />{{ lockTip }}</div>
 

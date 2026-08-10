@@ -25,9 +25,13 @@
 | --- | --- | --- | --- |
 | <img src="snapshots/home.png" width="200" alt="首页关卡列表" /> | <img src="snapshots/ready.png" width="200" alt="开始遮罩" /> | <img src="snapshots/game-grid.png" width="200" alt="方格对局" /> | <img src="snapshots/game-hex.png" width="200" alt="蜂巢对局" /> |
 
-| 通关结算 | 家庭排行榜 | 我的训练档案 |
-| --- | --- | --- |
-| <img src="snapshots/win.png" width="200" alt="通关结算" /> | <img src="snapshots/leaderboard.png" width="200" alt="家庭排行榜" /> | <img src="snapshots/profile.png" width="200" alt="我的训练档案" /> |
+| 圆盘布局 | 波浪布局 | 扇形布局 | 椭圆轨道 |
+| --- | --- | --- | --- |
+| <img src="snapshots/game-radial.png" width="200" alt="圆盘布局对局" /> | <img src="snapshots/game-wave.png" width="200" alt="波浪布局对局" /> | <img src="snapshots/game-fan.png" width="200" alt="扇形布局对局" /> | <img src="snapshots/game-orbit.png" width="200" alt="椭圆轨道对局" /> |
+
+| 花瓣布局 | 通关结算 | 家庭排行榜 | 我的训练档案 |
+| --- | --- | --- | --- |
+| <img src="snapshots/game-petal.png" width="200" alt="花瓣布局对局" /> | <img src="snapshots/win.png" width="200" alt="通关结算" /> | <img src="snapshots/leaderboard.png" width="200" alt="家庭排行榜" /> | <img src="snapshots/profile.png" width="200" alt="我的训练档案" /> |
 
 ## 环境要求
 

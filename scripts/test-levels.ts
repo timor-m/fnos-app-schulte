@@ -6,6 +6,7 @@ import {
   levelProfileForLevel,
   shapeForLevel,
   targetCountForLevel,
+  timeLimitForLevel,
   unlockedShapesForLevel
 } from "../packages/shared/levels";
 import { buildLevel, canonicalSeed } from "../packages/ui/src/game/levels";
@@ -139,6 +140,13 @@ for (let level = 1; level <= MAX_LEVEL; level += 1) {
 
 assert.equal(levelProfileForLevel(100).timeLimitMs, null);
 assert.ok((levelProfileForLevel(101).timeLimitMs ?? 0) > 0);
+assert.equal(timeLimitForLevel(101, "v3", "grid", 25), 60_000);
+assert.equal(timeLimitForLevel(120, "v3", "grid", 25), 60_000);
+assert.equal(timeLimitForLevel(121, "v3", "grid", 25), 55_000);
+assert.equal(timeLimitForLevel(150, "v3", "grid", 25), 55_000);
+assert.equal(timeLimitForLevel(151, "v3", "grid", 30), 60_000);
+assert.equal(timeLimitForLevel(199, "v3", "grid", 30), 60_000);
+assert.equal(timeLimitForLevel(200, "v3", "grid", 32), 51_200);
 assert.equal(buildLevel(200).distractorCount, 3);
 assert.equal(buildLevel(500).totalCount, 49);
 

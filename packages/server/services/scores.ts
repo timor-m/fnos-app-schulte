@@ -4,18 +4,30 @@ export type MergedBestRecord = {
   level: number;
   bestMs: number;
   plays: number;
+  isFastest: boolean;
 };
 
 export function mergedRecordsForUser(database: DatabaseSync, uid: string): MergedBestRecord[] {
-  return database
+  const rows = database
     .prepare(
-      `SELECT level, MIN(best_ms) AS bestMs, SUM(plays) AS plays
-       FROM bests_rulesets
-       WHERE uid = ?
-       GROUP BY level
-       ORDER BY level`
+      `WITH merged AS (
+         SELECT uid, level, MIN(best_ms) AS bestMs, SUM(plays) AS plays
+         FROM bests_rulesets
+         GROUP BY uid, level
+       ), fastest AS (
+         SELECT level, MIN(bestMs) AS fastestMs
+         FROM merged
+         GROUP BY level
+       )
+       SELECT merged.level, merged.bestMs, merged.plays,
+              CASE WHEN merged.bestMs = fastest.fastestMs THEN 1 ELSE 0 END AS isFastest
+       FROM merged
+       JOIN fastest ON fastest.level = merged.level
+       WHERE merged.uid = ?
+       ORDER BY merged.level`
     )
-    .all(uid) as MergedBestRecord[];
+    .all(uid) as Array<Omit<MergedBestRecord, "isFastest"> & { isFastest: number }>;
+  return rows.map((row) => ({ ...row, isFastest: row.isFastest === 1 }));
 }
 
 export function mergedBestForLevel(

@@ -57,7 +57,7 @@ export type MeData = {
     avgBestMs: number;
     weekPlays: number;
   };
-  records: Array<{ level: number; bestMs: number; plays: number }>;
+  records: Array<{ level: number; bestMs: number; plays: number; isFastest: boolean }>;
   bands: Array<{ name: string; from: number; to: number; done: number; total: number }>;
   recentPlays: PlayItem[];
   /** 最近成绩下一页游标，null 表示没有更多 */

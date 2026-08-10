@@ -1,21 +1,20 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { ArrowRight, Check, Home, RotateCcw, Share2, Star } from "lucide-vue-next";
-import { shapeName, type BoardShape, type Ruleset } from "../game/levels";
+import { computed, onBeforeUnmount, ref } from "vue";
+import { ArrowLeft, ArrowRight, Check, Copy, Home, LoaderCircle, RotateCcw, Star, TriangleAlert } from "lucide-vue-next";
+import { shapeName, type BoardShape } from "../game/levels";
 import { formatElapsed, formatPace } from "../game/format";
+import { createResultPoster } from "../game/poster";
 
 const props = defineProps<{
   level: number;
   shape: BoardShape;
-  ruleset: Ruleset;
   targetCount: number;
-  seed: number;
   timeMs: number;
   errors: number;
   best: number | null;
   isNewBest: boolean;
   hasNext: boolean;
-  shareUrl: (level: number, seed: number | null, ruleset: Ruleset) => string;
+  returnToPrevious: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -24,7 +23,12 @@ const emit = defineEmits<{
   (e: "home"): void;
 }>();
 
-const copied = ref(false);
+const shareState = ref<"idle" | "working" | "copied" | "failed">("idle");
+let shareResetTimer: number | null = null;
+
+onBeforeUnmount(() => {
+  if (shareResetTimer !== null) window.clearTimeout(shareResetTimer);
+});
 // 星级评定：按平均每格用时，1.0s/格以内三星，1.8s/格以内两星
 const stars = computed(() => {
   const pace = props.timeMs / props.targetCount / 1000;
@@ -65,15 +69,32 @@ const confetti = Array.from({ length: 26 }, (_, i) => {
 });
 
 async function shareResult() {
-  const url = props.shareUrl(props.level, props.seed, props.ruleset);
-  const text = `我在「舒尔特训练」第 ${props.level} 关（${shapeName(props.shape)}）用时 ${formatElapsed(props.timeMs)}，来挑战同一局面：${url}`;
+  if (shareState.value === "working") return;
+  shareState.value = "working";
+  if (shareResetTimer !== null) window.clearTimeout(shareResetTimer);
+
   try {
-    await navigator.clipboard.writeText(text);
-    copied.value = true;
-    window.setTimeout(() => (copied.value = false), 2000);
+    if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+      throw new Error("Image clipboard is unavailable");
+    }
+    const poster = createResultPoster({
+      level: props.level,
+      shapeName: shapeName(props.shape),
+      targetCount: props.targetCount,
+      time: formatElapsed(props.timeMs),
+      errors: props.errors,
+      pace: formatPace(props.timeMs, props.targetCount),
+      best: props.best !== null ? formatElapsed(props.best) : "--",
+      stars: stars.value,
+      starLabel: starLabel.value,
+      isNewBest: props.isNewBest
+    });
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": poster })]);
+    shareState.value = "copied";
   } catch {
-    window.prompt("复制分享链接", url);
+    shareState.value = "failed";
   }
+  shareResetTimer = window.setTimeout(() => (shareState.value = "idle"), 2400);
 }
 </script>
 
@@ -141,10 +162,18 @@ async function shareResult() {
       <div class="dialog-actions" :class="hasNext ? 'actions-4' : 'actions-3'">
         <button v-if="hasNext" type="button" class="btn primary" @click="emit('next')"><ArrowRight :size="16" />下一关</button>
         <button type="button" class="btn" @click="emit('replay')"><RotateCcw :size="16" />再玩一次</button>
-        <button type="button" class="btn" @click="shareResult">
-          <Check v-if="copied" :size="16" /><Share2 v-else :size="16" />{{ copied ? "已复制" : "分享成绩" }}
+        <button type="button" class="btn" :disabled="shareState === 'working'" @click="shareResult">
+          <LoaderCircle v-if="shareState === 'working'" :size="16" />
+          <Check v-else-if="shareState === 'copied'" :size="16" />
+          <TriangleAlert v-else-if="shareState === 'failed'" :size="16" />
+          <Copy v-else :size="16" />
+          {{ shareState === "working" ? "生成中" : shareState === "copied" ? "已复制海报" : shareState === "failed" ? "复制失败" : "复制海报" }}
         </button>
-        <button type="button" class="btn" @click="emit('home')"><Home :size="16" />返回主页</button>
+        <button type="button" class="btn" @click="emit('home')">
+          <ArrowLeft v-if="returnToPrevious" :size="16" />
+          <Home v-else :size="16" />
+          {{ returnToPrevious ? "返回" : "返回主页" }}
+        </button>
       </div>
     </div>
   </div>
