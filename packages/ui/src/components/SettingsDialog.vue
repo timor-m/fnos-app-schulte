@@ -12,7 +12,7 @@ const emit = defineEmits<{
 }>();
 
 function confirmClear() {
-  if (window.confirm("确定要清除全部关卡成绩与进度吗？此操作不可恢复。")) {
+  if (window.confirm("确定要清理本机缓存的成绩、进度与解锁记录吗？服务器数据不会受到影响。")) {
     clearAllData();
     window.location.reload();
   }
@@ -65,10 +65,10 @@ function confirmClear() {
 
       <div class="setting-row danger">
         <div>
-          <strong>清除全部数据</strong>
-          <p>删除本机保存的所有成绩与进度</p>
+          <strong>清理缓存</strong>
+          <p>清理本机保存的成绩、进度与解锁记录</p>
         </div>
-        <button type="button" class="btn danger" @click="confirmClear"><Trash2 :size="15" />清除</button>
+        <button type="button" class="btn danger" @click="confirmClear"><Trash2 :size="15" />清理</button>
       </div>
     </div>
   </div>

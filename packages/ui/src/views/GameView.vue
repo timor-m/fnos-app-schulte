@@ -42,7 +42,7 @@ import {
   playTap,
   unlockAudio
 } from "../game/sound";
-import { submitRecord } from "../game/api";
+import { fetchLevelBoard, submitRecord } from "../game/api";
 import CompleteDialog from "../components/CompleteDialog.vue";
 import FailDialog from "../components/FailDialog.vue";
 import BoardRenderer from "../components/BoardRenderer.vue";
@@ -78,6 +78,8 @@ const paused = ref(false);
 const finished = ref(false);
 const failed = ref(false);
 const isNewBest = ref(false);
+const levelBest = ref<number | null>(null);
+const isLevelBest = ref(false);
 const wrongId = ref<string | null>(null);
 const shared = ref(false);
 const unlockOpen = ref(false);
@@ -203,6 +205,7 @@ function finish() {
   vibrate(60);
 
   const ms = Math.round(elapsed.value);
+  isLevelBest.value = false;
   // 本地先记录保证界面即时反馈，同时上报服务器（排行榜与个人档案）
   const localBest = saveRecord(props.level, ms, props.ruleset);
   isNewBest.value = localBest;
@@ -212,6 +215,8 @@ function finish() {
     if (res) {
       isNewBest.value = res.isNewBest;
       best.value = res.best;
+      levelBest.value = res.levelBest;
+      isLevelBest.value = res.isLevelBest;
     }
   });
 
@@ -254,6 +259,8 @@ function resetState() {
   paused.value = false;
   finished.value = false;
   failed.value = false;
+  isNewBest.value = false;
+  isLevelBest.value = false;
   wrongId.value = null;
 }
 
@@ -317,6 +324,12 @@ function onKeydown(event: KeyboardEvent) {
 onMounted(() => {
   // 进入对局页即开始加载音效资源，点击开始时只负责解锁与播放。
   if (settings.sound) preloadAudio();
+  void fetchLevelBoard(props.level).then((data) => {
+    const fetchedBest = data?.entries[0]?.bestMs ?? null;
+    if (fetchedBest !== null && (levelBest.value === null || fetchedBest < levelBest.value)) {
+      levelBest.value = fetchedBest;
+    }
+  });
   if (props.autoStart) begin();
   window.addEventListener("keydown", onKeydown);
 });
@@ -419,6 +432,8 @@ onBeforeUnmount(() => {
       :errors="errors"
       :best="best"
       :is-new-best="isNewBest"
+      :level-best="levelBest"
+      :is-level-best="isLevelBest"
       :has-next="level < MAX_LEVEL"
       :return-to-previous="returnToPrevious"
       @next="nextLevel"

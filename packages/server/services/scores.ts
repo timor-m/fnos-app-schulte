@@ -45,6 +45,13 @@ export function mergedBestForLevel(
   return row;
 }
 
+export function mergedFastestForLevel(database: DatabaseSync, level: number): number | null {
+  const row = database
+    .prepare("SELECT MIN(best_ms) AS bestMs FROM bests_rulesets WHERE level = ?")
+    .get(level) as { bestMs: number | null };
+  return row.bestMs;
+}
+
 export function mergedLevelLeaderboard(database: DatabaseSync, level: number): Array<Record<string, unknown>> {
   return database
     .prepare(
@@ -86,4 +93,30 @@ export function mergedOverallLeaderboard(database: DatabaseSync): Array<Record<s
        LIMIT 50`
     )
     .all() as Array<Record<string, unknown>>;
+}
+
+export function mergedOverallRankForUser(database: DatabaseSync, uid: string): number | null {
+  const row = database
+    .prepare(
+      `WITH merged AS (
+         SELECT uid, level,
+                MIN(best_ms) AS best_ms,
+                SUM(plays) AS plays
+         FROM bests_rulesets
+         GROUP BY uid, level
+       ), overall AS (
+         SELECT uid,
+                COUNT(level) AS completed,
+                AVG(best_ms) AS avgBestMs
+         FROM merged
+         GROUP BY uid
+       ), ranked AS (
+         SELECT uid,
+                ROW_NUMBER() OVER (ORDER BY completed DESC, avgBestMs ASC) AS rank
+         FROM overall
+       )
+       SELECT rank FROM ranked WHERE uid = ?`
+    )
+    .get(uid) as { rank: number } | undefined;
+  return row?.rank ?? null;
 }

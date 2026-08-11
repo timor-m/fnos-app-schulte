@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import {
   mergedBestForLevel,
+  mergedFastestForLevel,
   mergedLevelLeaderboard,
   mergedOverallLeaderboard,
+  mergedOverallRankForUser,
   mergedRecordsForUser
 } from "../packages/server/services/scores";
 
@@ -38,8 +40,15 @@ assert.deepEqual(
     { level: 2, bestMs: 15000, plays: 1, isFastest: true }
   ]
 );
+
+assert.equal(mergedOverallRankForUser(database, "a"), 1);
+assert.equal(mergedOverallRankForUser(database, "b"), 2);
+assert.equal(mergedOverallRankForUser(database, "missing"), null);
 assert.deepEqual({ ...mergedBestForLevel(database, "a", 1) }, { bestMs: 10000, plays: 5 });
 assert.deepEqual({ ...mergedBestForLevel(database, "a", 99) }, { bestMs: null, plays: 0 });
+assert.equal(mergedFastestForLevel(database, 1), 9000);
+assert.equal(mergedFastestForLevel(database, 2), 15000);
+assert.equal(mergedFastestForLevel(database, 99), null);
 
 assert.deepEqual(
   mergedLevelLeaderboard(database, 1).map(({ uid, bestMs, plays }) => ({ uid, bestMs, plays })),

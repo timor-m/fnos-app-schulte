@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { Lock, Medal, Play, Timer } from "lucide-vue-next";
+import { Lock, Medal, Play, RefreshCw, Timer } from "lucide-vue-next";
 import {
   LEVEL_BANDS,
   MAX_LEVEL,
@@ -34,20 +34,39 @@ const doneCount = ref(0);
 const serverBests = ref<Map<number, number>>(new Map());
 const fastestLevels = ref<Set<number>>(new Set());
 const missedUnlock = ref<LayoutUnlock | null>(null);
+const refreshing = ref(false);
+const refreshStatus = ref<"idle" | "loading" | "success" | "failed">("idle");
+let refreshStatusTimer: number | null = null;
 
-onMounted(async () => {
+async function refreshLevels(showStatus = false) {
+  if (refreshing.value) return;
+  refreshing.value = true;
+  if (refreshStatusTimer !== null) window.clearTimeout(refreshStatusTimer);
+  if (showStatus) refreshStatus.value = "loading";
   progress.value = loadProgress();
   doneCount.value = completedCount();
-  // 服务器成绩优先（同账号多设备同步），失败时退回本机记录
-  const me = await fetchMe();
-  if (me) {
-    serverBests.value = new Map(me.records.map((r) => [r.level, r.bestMs]));
-    fastestLevels.value = new Set(me.records.filter((r) => r.isFastest).map((r) => r.level));
-    doneCount.value = me.summary.completed;
-    progress.value = Math.max(progress.value, ...me.records.map((r) => r.level), 0);
+  let succeeded = false;
+  try {
+    // 服务器成绩优先（同账号多设备同步），失败时保留本机记录。
+    const me = await fetchMe();
+    if (me) {
+      succeeded = true;
+      serverBests.value = new Map(me.records.map((r) => [r.level, r.bestMs]));
+      fastestLevels.value = new Set(me.records.filter((r) => r.isFastest).map((r) => r.level));
+      doneCount.value = me.summary.completed;
+      progress.value = Math.max(progress.value, ...me.records.map((r) => r.level), 0);
+    }
+    missedUnlock.value = highestUnseenLayoutUnlock(progress.value);
+  } finally {
+    refreshing.value = false;
+    if (showStatus) {
+      refreshStatus.value = succeeded ? "success" : "failed";
+      refreshStatusTimer = window.setTimeout(() => (refreshStatus.value = "idle"), 2200);
+    }
   }
-  missedUnlock.value = highestUnseenLayoutUnlock(progress.value);
-});
+}
+
+onMounted(() => void refreshLevels());
 
 /** 已通关关卡集合：服务器成绩优先，本机记录兜底 */
 const doneLevels = computed(() => {
@@ -162,6 +181,7 @@ function onLevelTap(item: { level: number; locked: boolean }) {
 
 onBeforeUnmount(() => {
   if (lockTipTimer !== null) window.clearTimeout(lockTipTimer);
+  if (refreshStatusTimer !== null) window.clearTimeout(refreshStatusTimer);
 });
 </script>
 
@@ -169,7 +189,30 @@ onBeforeUnmount(() => {
   <main class="home">
     <section class="home-hero">
       <div class="hero-info">
-        <h1>舒尔特训练</h1>
+        <div class="hero-title-row">
+          <h1>舒尔特训练</h1>
+          <span class="hero-refresh-control">
+            <span
+              v-if="refreshStatus !== 'idle'"
+              class="hero-refresh-status"
+              :class="refreshStatus"
+              role="status"
+            >
+              {{ refreshStatus === "loading" ? "正在刷新" : refreshStatus === "success" ? "已刷新" : "刷新失败" }}
+            </span>
+            <button
+              type="button"
+              class="hero-refresh"
+              :class="{ refreshing }"
+              :disabled="refreshing"
+              aria-label="刷新关卡数据"
+              title="刷新关卡数据"
+              @click="refreshLevels(true)"
+            >
+              <RefreshCw :size="18" />
+            </button>
+          </span>
+        </div>
         <p>13 种布局渐进穿插，按 1 到 N 的顺序点按，并从第 200 关起避开字母干扰。</p>
         <div class="hero-stats">
           <span>已完成 <strong>{{ doneCount }}</strong> / {{ MAX_LEVEL }} 关</span>

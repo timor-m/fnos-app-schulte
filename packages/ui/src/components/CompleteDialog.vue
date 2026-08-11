@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from "vue";
-import { ArrowLeft, ArrowRight, Check, Copy, Home, LoaderCircle, RotateCcw, Star, TriangleAlert } from "lucide-vue-next";
+import { ArrowLeft, ArrowRight, Check, Copy, Crown, Home, LoaderCircle, RotateCcw, Star, TriangleAlert } from "lucide-vue-next";
 import { shapeName, type BoardShape } from "../game/levels";
 import { formatElapsed, formatPace } from "../game/format";
 import { createResultPoster } from "../game/poster";
@@ -13,6 +13,8 @@ const props = defineProps<{
   errors: number;
   best: number | null;
   isNewBest: boolean;
+  levelBest: number | null;
+  isLevelBest: boolean;
   hasNext: boolean;
   returnToPrevious: boolean;
 }>();
@@ -38,6 +40,15 @@ const stars = computed(() => {
 });
 
 const starLabel = computed(() => ["继续加油", "表现出色", "眼疾手快"][stars.value - 1]);
+
+const STAR_SHARDS = [
+  { x: -28, y: -18, rotation: -36 },
+  { x: -34, y: 8, rotation: -70 },
+  { x: -16, y: 26, rotation: -18 },
+  { x: 18, y: -27, rotation: 28 },
+  { x: 32, y: -5, rotation: 68 },
+  { x: 24, y: 23, rotation: 42 }
+];
 
 const CONFETTI_COLORS = ["#2f9e6e", "#eeb54a", "#e8834f", "#6d8fc4", "#c46a8a"];
 const confetti = Array.from({ length: 26 }, (_, i) => {
@@ -126,19 +137,44 @@ async function shareResult() {
         aria-hidden="true"
       ></span>
 
+      <aside class="win-leader-record" :class="{ crowned: isLevelBest }" aria-live="polite">
+        <Crown :size="15" :stroke-width="2.2" aria-hidden="true" />
+        <span>{{ isLevelBest ? "最佳认证" : "单关榜最佳" }}</span>
+        <strong class="mono">{{ levelBest !== null ? formatElapsed(levelBest) : "--" }}</strong>
+      </aside>
+
       <p class="dialog-eyebrow">{{ isNewBest ? "新纪录" : "闯关成功" }}</p>
       <h2>第 {{ level }} 关 · {{ shapeName(shape) }}</h2>
 
       <div class="stars" :aria-label="`${stars} 星评价`">
-        <Star
+        <span
           v-for="n in 3"
           :key="n"
-          class="star"
-          :class="{ lit: n <= stars }"
-          :style="{ animationDelay: `${0.25 + n * 0.16}s` }"
-          :fill="n <= stars ? 'currentColor' : 'currentColor'"
-          :stroke-width="0"
-        />
+          class="star-stage"
+          :class="{ earned: n <= stars, featured: n === 2 }"
+        >
+          <Star class="star-base" fill="currentColor" :stroke-width="0" />
+          <span
+            v-if="n <= stars"
+            class="star-fill"
+            :style="{ '--star-fill-delay': `${0.18 + n * 0.34}s` }"
+            aria-hidden="true"
+          >
+            <Star class="star-color" fill="currentColor" :stroke-width="0" />
+          </span>
+          <span
+            v-for="(shard, shardIndex) in n <= stars ? STAR_SHARDS : []"
+            :key="shardIndex"
+            class="star-shard"
+            :style="{
+              '--star-shard-x': `${shard.x}px`,
+              '--star-shard-y': `${shard.y}px`,
+              '--star-shard-rotation': `${shard.rotation}deg`,
+              '--star-shard-delay': `${0.62 + n * 0.34 + shardIndex * 0.025}s`
+            }"
+            aria-hidden="true"
+          ></span>
+        </span>
       </div>
       <p class="star-label">{{ starLabel }}</p>
 
@@ -160,8 +196,8 @@ async function shareResult() {
       </dl>
 
       <div class="dialog-actions" :class="hasNext ? 'actions-4' : 'actions-3'">
-        <button v-if="hasNext" type="button" class="btn primary" @click="emit('next')"><ArrowRight :size="16" />下一关</button>
         <button type="button" class="btn" @click="emit('replay')"><RotateCcw :size="16" />再玩一次</button>
+        <button v-if="hasNext" type="button" class="btn primary" @click="emit('next')"><ArrowRight :size="16" />下一关</button>
         <button type="button" class="btn" :disabled="shareState === 'working'" @click="shareResult">
           <LoaderCircle v-if="shareState === 'working'" :size="16" />
           <Check v-else-if="shareState === 'copied'" :size="16" />

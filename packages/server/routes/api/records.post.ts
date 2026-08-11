@@ -2,7 +2,7 @@ import { defineEventHandler, readBody } from "h3";
 import { fail, ok } from "../../utils/api-response";
 import { getIdentity } from "../../utils/identity";
 import { getDb, upsertUser } from "../../services/db";
-import { mergedBestForLevel } from "../../services/scores";
+import { mergedBestForLevel, mergedFastestForLevel } from "../../services/scores";
 import { CURRENT_RULESET, isValidLevel } from "../../../shared/levels";
 
 type SubmitBody = {
@@ -54,9 +54,13 @@ export default defineEventHandler(async (event) => {
        updated_at = excluded.updated_at`
   ).run(identity.uid, ruleset, level, roundedMs, now);
 
+  const levelBest = mergedFastestForLevel(db, level);
+
   return ok({
     best: isNewBest ? roundedMs : previous.bestMs,
     isNewBest,
-    plays: previous.plays + 1
+    plays: previous.plays + 1,
+    levelBest,
+    isLevelBest: levelBest !== null && roundedMs === levelBest
   });
 });

@@ -5,6 +5,7 @@ import HomeView from "./views/HomeView.vue";
 import GameView from "./views/GameView.vue";
 import LeaderboardView from "./views/LeaderboardView.vue";
 import ProfileView from "./views/ProfileView.vue";
+import PlayerProfileView from "./views/PlayerProfileView.vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
 import { clampLevel, canonicalSeed, parseSeed, type Ruleset } from "./game/levels";
 import { loadSettings, saveSettings, type GameSettings, DEFAULT_SETTINGS } from "./game/storage";
@@ -14,7 +15,8 @@ import appIcon from "./assets/app-icon.png";
 
 type GameLocation = { level: number; seed: number | null; ruleset: Ruleset };
 type GameTarget = GameLocation & { autoStart: boolean };
-type View = "home" | "leaderboard" | "me" | "game";
+type MainTab = "home" | "leaderboard" | "me";
+type View = MainTab | "player" | "game";
 type LeaderboardState = { scope: "overall" | "level"; level: number };
 
 const view = ref<View>("home");
@@ -23,6 +25,7 @@ const username = ref<string | null>(null);
 const settingsOpen = ref(false);
 const leaderboardState = reactive<LeaderboardState>({ scope: "overall", level: 1 });
 const gameReturn = ref<LeaderboardState | null>(null);
+const selectedPlayerUid = ref<string | null>(null);
 
 const settings = reactive<GameSettings>({ ...DEFAULT_SETTINGS, ...loadSettings() });
 
@@ -60,6 +63,17 @@ function updateLeaderboardState(scope: LeaderboardState["scope"], level: number)
   leaderboardState.level = level;
 }
 
+function openPlayer(uid: string) {
+  selectedPlayerUid.value = uid;
+  view.value = "player";
+  clearGameUrl();
+}
+
+function returnToLeaderboard() {
+  view.value = "leaderboard";
+  clearGameUrl();
+}
+
 function clearGameUrl() {
   const url = new URL(window.location.href);
   if (url.search) {
@@ -84,7 +98,7 @@ function returnFromGame() {
   goHome();
 }
 
-function goTab(tab: Exclude<View, "game">) {
+function goTab(tab: MainTab) {
   view.value = tab;
   if (tab === "home") {
     goHome();
@@ -141,7 +155,7 @@ onMounted(async () => {
           <button type="button" :class="{ active: view === 'home' || view === 'game' }" @click="goTab('home')">
             <Gamepad2 :size="16" /><span>游戏</span>
           </button>
-          <button type="button" :class="{ active: view === 'leaderboard' }" @click="goTab('leaderboard')">
+          <button type="button" :class="{ active: view === 'leaderboard' || view === 'player' }" @click="goTab('leaderboard')">
             <Trophy :size="16" /><span>排行榜</span>
           </button>
           <button type="button" :class="{ active: view === 'me' }" @click="goTab('me')">
@@ -160,9 +174,16 @@ onMounted(async () => {
       :initial-scope="leaderboardState.scope"
       :initial-level="leaderboardState.level"
       @play="openLeaderboardGame"
+      @player="openPlayer"
       @state-change="updateLeaderboardState"
     />
     <ProfileView v-else-if="view === 'me'" @play="openDefaultGame" />
+    <PlayerProfileView
+      v-else-if="view === 'player' && selectedPlayerUid"
+      :key="selectedPlayerUid"
+      :uid="selectedPlayerUid"
+      @back="returnToLeaderboard"
+    />
     <GameView
       v-else
       :key="`${target.ruleset}:${target.level}:${target.seed ?? 'canon'}`"

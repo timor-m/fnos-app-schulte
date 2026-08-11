@@ -20,6 +20,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "play", level: number): void;
+  (e: "player", uid: string): void;
   (e: "state-change", scope: LeaderboardScope, level: number): void;
 }>();
 
@@ -175,11 +176,19 @@ onMounted(() => void load());
             </span>
             <strong v-else>{{ entry.rank }}</strong>
           </span>
-          <span class="avatar" :style="avatarStyle(entry.uid)">{{ initial(entry.username) }}</span>
-          <span class="overall-person">
+          <button
+            type="button"
+            class="avatar player-avatar-link"
+            :style="avatarStyle(entry.uid)"
+            :aria-label="`查看 ${entry.username} 的主页`"
+            @click="emit('player', entry.uid)"
+          >
+            {{ initial(entry.username) }}
+          </button>
+          <button type="button" class="overall-person player-name-link" @click="emit('player', entry.uid)">
             <strong>{{ entry.username }}<em v-if="entry.isMe">（我）</em></strong>
             <small>第 {{ entry.rank }} 名</small>
-          </span>
+          </button>
           <span class="overall-stat primary-stat">
             <strong>{{ entry.completed }}</strong>
             <small>通关数</small>
@@ -204,8 +213,18 @@ onMounted(() => void load());
       <section v-else class="rank-list">
         <div v-for="entry in levelEntries" :key="entry.uid" class="rank-row" :class="{ me: entry.isMe }">
           <span class="rank-num" :class="{ top: entry.rank <= 3 }">{{ entry.rank }}</span>
-          <span class="avatar small" :style="avatarStyle(entry.uid)">{{ initial(entry.username) }}</span>
-          <span class="rank-name">{{ entry.username }}<em v-if="entry.isMe">（我）</em></span>
+          <button
+            type="button"
+            class="avatar small player-avatar-link"
+            :style="avatarStyle(entry.uid)"
+            :aria-label="`查看 ${entry.username} 的主页`"
+            @click="emit('player', entry.uid)"
+          >
+            {{ initial(entry.username) }}
+          </button>
+          <button type="button" class="rank-name player-name-link" @click="emit('player', entry.uid)">
+            {{ entry.username }}<em v-if="entry.isMe">（我）</em>
+          </button>
           <span class="rank-stat"><strong class="mono">{{ formatElapsed(entry.bestMs) }}</strong></span>
           <span class="rank-stat hide-sm">{{ entry.plays }} 次尝试</span>
         </div>

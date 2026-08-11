@@ -83,6 +83,40 @@ export function fetchMyPlays(cursor: number): Promise<{ plays: PlayItem[]; nextC
   return get<{ plays: PlayItem[]; nextCursor: number | null }>(`me-plays?cursor=${cursor}`);
 }
 
+export type PlayerData = {
+  user: {
+    uid: string;
+    username: string;
+    isMe: boolean;
+  };
+  summary: {
+    rank: number | null;
+    completed: number;
+    totalPlays: number;
+    avgBestMs: number;
+    weekPlays: number;
+    fastestCount: number;
+    lastActive: number | null;
+  };
+  records: Array<{ level: number; bestMs: number; plays: number; isFastest: boolean }>;
+  bands: Array<{ name: string; from: number; to: number; done: number; total: number }>;
+  recentPlays: PlayItem[];
+  playsCursor: number | null;
+};
+
+export function fetchPlayer(uid: string): Promise<PlayerData | null> {
+  return get<PlayerData>(`player?uid=${encodeURIComponent(uid)}`);
+}
+
+export function fetchPlayerPlays(
+  uid: string,
+  cursor: number
+): Promise<{ plays: PlayItem[]; nextCursor: number | null } | null> {
+  return get<{ plays: PlayItem[]; nextCursor: number | null }>(
+    `player-plays?uid=${encodeURIComponent(uid)}&cursor=${cursor}`
+  );
+}
+
 export function fetchOverallBoard(): Promise<{ entries: OverallEntry[] } | null> {
   return get<{ entries: OverallEntry[] }>("leaderboard");
 }
@@ -91,7 +125,13 @@ export function fetchLevelBoard(level: number): Promise<{ entries: LevelEntry[] 
   return get<{ entries: LevelEntry[] }>(`leaderboard?level=${level}`);
 }
 
-export type SubmitResult = { best: number; isNewBest: boolean; plays: number };
+export type SubmitResult = {
+  best: number;
+  isNewBest: boolean;
+  plays: number;
+  levelBest: number;
+  isLevelBest: boolean;
+};
 
 export async function submitRecord(payload: {
   level: number;
