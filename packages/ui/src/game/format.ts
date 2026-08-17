@@ -1,20 +1,15 @@
 export function formatElapsed(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  const tenths = Math.floor((ms % 1000) / 100);
-  if (minutes > 0) {
-    return `${minutes}:${String(seconds).padStart(2, "0")}.${tenths}`;
-  }
-  return `${seconds}.${tenths}s`;
+  const safeMs = Math.max(0, ms);
+  const totalTenths = Math.floor(safeMs / 100);
+  return `${(totalTenths / 10).toFixed(1)}s`;
 }
 
-/** 倒计时专用：固定使用 m:ss，剩余 0.x 秒仍显示 0:01。 */
+/** 倒计时专用：固定使用 mm:ss，剩余 0.x 秒仍显示 00:01。 */
 export function formatCountdown(ms: number): string {
   const totalSeconds = Math.ceil(Math.max(0, ms) / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 export function formatPace(ms: number, count: number): string {

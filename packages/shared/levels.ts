@@ -93,6 +93,11 @@ const SHAPE_TIME_FACTORS: Record<BoardShape, number> = {
   petal: 1.1
 };
 
+const ADVANCED_TIME_START_LEVEL = 200;
+const ADVANCED_START_PER_TARGET_MS = 1900;
+const ADVANCED_END_PER_TARGET_MS = 1400;
+const DISTRACTOR_TIME_BONUS_MS = 150;
+
 const shapeCache: BoardShape[] = [];
 
 function hashString(input: string): number {
@@ -263,10 +268,11 @@ export function timeLimitForLevel(
       ? 2200
       : level < 200
         ? 2000
-        : level <= 300
-          ? 1600
-          : level <= 400
-            ? 1500
-            : 1400;
-  return Math.round(targetCount * perTargetMs * SHAPE_TIME_FACTORS[shape]);
+        : ADVANCED_START_PER_TARGET_MS
+          - ((level - ADVANCED_TIME_START_LEVEL) / (MAX_LEVEL - ADVANCED_TIME_START_LEVEL))
+            * (ADVANCED_START_PER_TARGET_MS - ADVANCED_END_PER_TARGET_MS);
+  const distractorBonus = level >= ADVANCED_TIME_START_LEVEL
+    ? distractorCountForLevel(level, ruleset) * DISTRACTOR_TIME_BONUS_MS
+    : 0;
+  return Math.round(targetCount * perTargetMs * SHAPE_TIME_FACTORS[shape] + distractorBonus);
 }

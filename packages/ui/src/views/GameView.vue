@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -47,6 +47,7 @@ import CompleteDialog from "../components/CompleteDialog.vue";
 import FailDialog from "../components/FailDialog.vue";
 import BoardRenderer from "../components/BoardRenderer.vue";
 import LayoutUnlockDialog from "../components/LayoutUnlockDialog.vue";
+import CopyLinkDialog from "../components/CopyLinkDialog.vue";
 
 const props = defineProps<{
   level: number;
@@ -54,6 +55,7 @@ const props = defineProps<{
   ruleset: Ruleset;
   autoStart: boolean;
   returnToPrevious: boolean;
+  externalPause: boolean;
   shareUrl: (level: number, seed: number | null, ruleset: Ruleset) => string;
 }>();
 
@@ -62,6 +64,7 @@ const emit = defineEmits<{
   (e: "return"): void;
   (e: "navigate", level: number, ruleset: Ruleset, seed: number | null, autoStart: boolean): void;
   (e: "seed-change", seed: number): void;
+  (e: "activity-change", active: boolean): void;
 }>();
 
 const settings = inject<GameSettings>("settings")!;
@@ -83,6 +86,8 @@ const isLevelBest = ref(false);
 const wrongId = ref<string | null>(null);
 const shared = ref(false);
 const unlockOpen = ref(false);
+const shareFallbackUrl = ref<string | null>(null);
+const shareButton = ref<HTMLButtonElement | null>(null);
 
 let timer: number | null = null;
 let startedAt = 0;
@@ -112,17 +117,28 @@ function tick() {
   }
 }
 
+function captureElapsed() {
+  if (started.value && !paused.value) {
+    elapsed.value = accumulated + (performance.now() - startedAt);
+    accumulated = elapsed.value;
+  }
+  return elapsed.value;
+}
+
 function startTimer() {
   if (started.value) return;
   started.value = true;
+  emit("activity-change", true);
   startedAt = performance.now();
   timer = window.setInterval(tick, 100);
 }
 
 function begin() {
+  if (started.value) return;
+  // 先开放棋盘输入，音频初始化不能阻塞开始状态。
+  startTimer();
   if (settings.sound) unlockAudio();
   if (settings.sound) safeSound(playStart);
-  startTimer();
 }
 
 function stopTimer() {
@@ -179,6 +195,10 @@ function markWrong(cell: CellSpec) {
 
 function tapCell(cell: CellSpec) {
   if (!started.value || paused.value || finished.value || failed.value) return;
+  if (timeLimit !== null && accumulated + (performance.now() - startedAt) >= timeLimit) {
+    tick();
+    return;
+  }
 
   if (cell.kind === "distractor") {
     markWrong(cell);
@@ -197,9 +217,10 @@ function tapCell(cell: CellSpec) {
 }
 
 function finish() {
-  accumulated = elapsed.value;
+  captureElapsed();
   stopTimer();
   finished.value = true;
+  emit("activity-change", false);
   cancelTapSound();
   safeSound(playComplete);
   vibrate(60);
@@ -227,12 +248,20 @@ function finish() {
 }
 
 function fail() {
-  accumulated = elapsed.value;
+  captureElapsed();
   stopTimer();
   failed.value = true;
+  emit("activity-change", false);
   cancelTapSound();
   safeSound(playFail);
   vibrate([60, 40, 60]);
+}
+
+function pauseGame() {
+  if (!started.value || paused.value || finished.value || failed.value) return;
+  captureElapsed();
+  stopTimer();
+  paused.value = true;
 }
 
 function togglePause() {
@@ -242,9 +271,7 @@ function togglePause() {
     startedAt = performance.now();
     timer = window.setInterval(tick, 100);
   } else {
-    accumulated = elapsed.value;
-    stopTimer();
-    paused.value = true;
+    pauseGame();
   }
 }
 
@@ -259,6 +286,7 @@ function resetState() {
   paused.value = false;
   finished.value = false;
   failed.value = false;
+  emit("activity-change", false);
   isNewBest.value = false;
   isLevelBest.value = false;
   wrongId.value = null;
@@ -286,8 +314,15 @@ async function share() {
     shared.value = true;
     window.setTimeout(() => (shared.value = false), 2000);
   } catch {
-    window.prompt("复制分享链接", url);
+    pauseGame();
+    shareFallbackUrl.value = url;
   }
+}
+
+async function closeShareFallback() {
+  shareFallbackUrl.value = null;
+  await nextTick();
+  shareButton.value?.focus();
 }
 
 function nextLevel() {
@@ -297,7 +332,7 @@ function nextLevel() {
       unlockOpen.value = true;
       return;
     }
-    emit("navigate", props.level + 1, props.ruleset, null, true);
+    emit("navigate", props.level + 1, props.ruleset, null, false);
   }
 }
 
@@ -305,7 +340,7 @@ function playUnlockedLayout() {
   const unlock = layoutUnlockAfter(props.level);
   if (!unlock) return;
   markLayoutUnlockSeen(unlock.level);
-  emit("navigate", unlock.level, props.ruleset, null, true);
+  emit("navigate", unlock.level, props.ruleset, null, false);
 }
 
 function deferUnlockedLayout() {
@@ -315,11 +350,27 @@ function deferUnlockedLayout() {
 }
 
 function onKeydown(event: KeyboardEvent) {
+  if (event.defaultPrevented) return;
   if (event.key === "Escape") {
     if (finished.value || failed.value) return;
     togglePause();
   }
 }
+
+function onVisibilityChange() {
+  if (document.hidden) pauseGame();
+}
+
+function onWindowBlur() {
+  pauseGame();
+}
+
+watch(
+  () => props.externalPause,
+  (shouldPause) => {
+    if (shouldPause) pauseGame();
+  }
+);
 
 onMounted(() => {
   // 进入对局页即开始加载音效资源，点击开始时只负责解锁与播放。
@@ -332,11 +383,15 @@ onMounted(() => {
   });
   if (props.autoStart) begin();
   window.addEventListener("keydown", onKeydown);
+  window.addEventListener("blur", onWindowBlur);
+  document.addEventListener("visibilitychange", onVisibilityChange);
 });
 onBeforeUnmount(() => {
   stopTimer();
   cancelTapSound();
   window.removeEventListener("keydown", onKeydown);
+  window.removeEventListener("blur", onWindowBlur);
+  document.removeEventListener("visibilitychange", onVisibilityChange);
 });
 </script>
 
@@ -380,14 +435,28 @@ onBeforeUnmount(() => {
         <button class="icon-btn" type="button" aria-label="重新排版" title="重新排版（换一套排布与配色）" @click="refreshLayout">
           <Shuffle :size="20" />
         </button>
-        <button class="icon-btn" type="button" :aria-label="paused ? '继续' : '暂停'" :title="paused ? '继续' : '暂停'" @click="togglePause">
+        <button
+          class="icon-btn"
+          type="button"
+          :disabled="!started || finished || failed"
+          :aria-label="paused ? '继续' : '暂停'"
+          :title="paused ? '继续' : '暂停'"
+          @click="togglePause"
+        >
           <Pause v-if="!paused" :size="20" />
           <Play v-else :size="20" fill="currentColor" />
         </button>
-        <button class="icon-btn" type="button" aria-label="重新开始" title="重新开始" @click="restart">
+        <button
+          class="icon-btn"
+          type="button"
+          :disabled="!started || finished || failed"
+          aria-label="重新开始"
+          title="重新开始"
+          @click="restart"
+        >
           <RotateCcw :size="20" />
         </button>
-        <button class="icon-btn" type="button" aria-label="分享本关" title="分享本关" @click="share">
+        <button ref="shareButton" class="icon-btn" type="button" aria-label="分享本关" title="分享本关" @click="share">
           <Check v-if="shared" :size="20" :stroke-width="2.4" />
           <Share2 v-else :size="20" />
         </button>
@@ -410,7 +479,9 @@ onBeforeUnmount(() => {
         <div v-if="ready" class="ready-mask">
           <p class="ready-title">第 {{ level }} 关 · {{ shapeLabel }}</p>
           <p v-if="timeLimit !== null" class="ready-limit"><Timer :size="13" />限时 {{ formatCountdown(timeLimit) }}</p>
-          <button type="button" class="start-btn" @click="begin"><Play :size="18" fill="currentColor" />开始</button>
+          <button type="button" class="start-btn" @touchstart.prevent="begin" @click="begin">
+            <Play :size="18" fill="currentColor" />开始
+          </button>
           <p class="ready-hint">
             按 1 到 {{ total }} 依次点按
             <template v-if="spec.distractorCount">，忽略 {{ spec.distractorCount }} 个字母</template>
@@ -458,6 +529,12 @@ onBeforeUnmount(() => {
       @retry="restart"
       @reshuffle="refreshLayout"
       @home="emit('exit')"
+    />
+
+    <CopyLinkDialog
+      v-if="shareFallbackUrl"
+      :url="shareFallbackUrl"
+      @close="closeShareFallback"
     />
   </main>
 </template>

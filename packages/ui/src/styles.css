@@ -232,6 +232,10 @@ button {
   font-size: 13px;
 }
 
+.board-error .btn {
+  margin: 16px auto 0;
+}
+
 .overall-list {
   display: flex;
   flex-direction: column;
@@ -946,6 +950,13 @@ button {
   transform: scale(0.94);
 }
 
+.icon-btn:disabled {
+  cursor: default;
+  background: #f4f6f3;
+  color: #b7c2b6;
+  transform: none;
+}
+
 /* ---------- 通用按钮 / 弹窗 ---------- */
 
 .btn {
@@ -989,6 +1000,16 @@ button {
   color: var(--danger);
 }
 
+.btn.danger.solid {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn.danger.solid:hover {
+  background: #b9483a;
+}
+
 .dialog-backdrop {
   position: fixed;
   inset: 0;
@@ -998,6 +1019,14 @@ button {
   padding: 20px;
   background: rgba(34, 51, 40, 0.36);
   backdrop-filter: blur(4px);
+}
+
+.dialog-backdrop.inactive {
+  pointer-events: none;
+}
+
+.dialog-backdrop.modal-front {
+  z-index: 70;
 }
 
 .dialog {
@@ -1077,6 +1106,57 @@ button {
   justify-content: center;
   padding: 10px 12px;
   white-space: nowrap;
+}
+
+.confirm-dialog {
+  width: min(400px, 100%);
+}
+
+.confirm-icon {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.confirm-icon.danger {
+  background: #fdeceb;
+  color: var(--danger);
+}
+
+.confirm-message {
+  margin: 8px auto 22px;
+  max-width: 340px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.copy-link-dialog {
+  width: min(500px, 100%);
+  text-align: left;
+}
+
+.copy-link-input {
+  width: 100%;
+  min-height: 44px;
+  margin: 12px 0 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  outline: none;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.copy-link-input:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px rgba(47, 158, 110, 0.16);
 }
 
 /* ---------- 倒计时与结算弹窗 ---------- */
@@ -1482,6 +1562,118 @@ button {
 
 .setting-row.danger .btn {
   flex-shrink: 0;
+}
+
+.setting-link {
+  width: 100%;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.setting-link:hover {
+  color: var(--brand-deep);
+}
+
+.setting-link-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.setting-link-label > svg,
+.setting-link > svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.setting-link p {
+  font-weight: 400;
+}
+
+.about-dialog {
+  text-align: left;
+}
+
+.about-brand {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 12px 0 20px;
+}
+
+.about-brand img {
+  flex-shrink: 0;
+  border-radius: 14px;
+}
+
+.about-brand div {
+  display: grid;
+  gap: 3px;
+}
+
+.about-brand strong {
+  font-size: 18px;
+}
+
+.about-brand span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.about-meta {
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+
+.about-meta > div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 14px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.about-meta dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.about-meta dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.about-github {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-top: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.about-github:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+}
+
+.about-github svg:last-child {
+  color: var(--muted);
 }
 
 .switch {

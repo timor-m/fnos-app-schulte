@@ -27,6 +27,7 @@ const emit = defineEmits<{
 const scope = ref<LeaderboardScope>(props.initialScope);
 const level = ref(Math.min(MAX_LEVEL, Math.max(1, props.initialLevel)));
 const loading = ref(true);
+const loadError = ref(false);
 const overall = ref<OverallEntry[]>([]);
 const levelEntries = ref<LevelEntry[]>([]);
 const levelPickerOpen = ref(false);
@@ -81,14 +82,23 @@ async function load() {
   const requestedScope = scope.value;
   const requestedLevel = level.value;
   loading.value = true;
+  loadError.value = false;
   if (requestedScope === "overall") {
     const data = await fetchOverallBoard();
     if (request !== loadRequest) return;
-    overall.value = data?.entries ?? [];
+    if (!data) {
+      loadError.value = true;
+    } else {
+      overall.value = data.entries;
+    }
   } else {
     const data = await fetchLevelBoard(requestedLevel);
     if (request !== loadRequest) return;
-    levelEntries.value = data?.entries ?? [];
+    if (!data) {
+      loadError.value = true;
+    } else {
+      levelEntries.value = data.entries;
+    }
   }
   loading.value = false;
 }
@@ -112,7 +122,7 @@ onMounted(() => void load());
           <button type="button" :class="{ active: scope === 'overall' }" @click="scope = 'overall'">总榜</button>
           <button type="button" :class="{ active: scope === 'level' }" @click="scope = 'level'">单关榜</button>
         </div>
-        <button class="icon-btn" type="button" aria-label="刷新" title="刷新" @click="load">
+        <button class="icon-btn" type="button" :disabled="loading" aria-label="刷新" title="刷新" @click="load">
           <RefreshCw :size="17" />
         </button>
       </div>
@@ -156,6 +166,12 @@ onMounted(() => void load());
     </section>
 
     <div v-if="loading" class="board-empty">加载中…</div>
+
+    <div v-else-if="loadError" class="board-empty board-error">
+      <p>排行榜加载失败</p>
+      <span>请检查网络连接后重试</span>
+      <button type="button" class="btn" @click="load"><RefreshCw :size="15" />重新加载</button>
+    </div>
 
     <template v-else-if="scope === 'overall'">
       <div v-if="overall.length === 0" class="board-empty">

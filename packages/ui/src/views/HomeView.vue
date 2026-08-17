@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { Lock, Medal, Play, RefreshCw, Timer } from "lucide-vue-next";
 import {
   LEVEL_BANDS,
@@ -24,6 +24,10 @@ import { fetchMe } from "../game/api";
 import LayoutUnlockDialog from "../components/LayoutUnlockDialog.vue";
 import ShapeIcon from "../components/ShapeIcon.vue";
 import type { LayoutUnlock } from "../game/levels";
+
+const props = defineProps<{
+  scrollToLevel?: number | null;
+}>();
 
 const emit = defineEmits<{
   (e: "start", level: number): void;
@@ -67,6 +71,17 @@ async function refreshLevels(showStatus = false) {
 }
 
 onMounted(() => void refreshLevels());
+
+onMounted(async () => {
+  if (!props.scrollToLevel) return;
+  await nextTick();
+  window.requestAnimationFrame(() => {
+    document.getElementById(`level-${props.scrollToLevel}`)?.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    });
+  });
+});
 
 /** 已通关关卡集合：服务器成绩优先，本机记录兜底 */
 const doneLevels = computed(() => {
@@ -262,6 +277,7 @@ onBeforeUnmount(() => {
         <button
           v-for="item in section.items"
           :key="item.level"
+          :id="`level-${item.level}`"
           type="button"
           class="level-cell"
           :class="{ done: item.done, current: item.level === nextLevel, locked: item.locked }"

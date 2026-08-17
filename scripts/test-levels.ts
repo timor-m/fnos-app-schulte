@@ -146,7 +146,22 @@ assert.equal(timeLimitForLevel(121, "v3", "grid", 25), 55_000);
 assert.equal(timeLimitForLevel(150, "v3", "grid", 25), 55_000);
 assert.equal(timeLimitForLevel(151, "v3", "grid", 30), 60_000);
 assert.equal(timeLimitForLevel(199, "v3", "grid", 30), 60_000);
-assert.equal(timeLimitForLevel(200, "v3", "grid", 32), 51_200);
+assert.equal(timeLimitForLevel(200, "v3", "grid", 32), 61_250);
+assert.equal(timeLimitForLevel(300, "v3", "grid", 34), 60_283);
+assert.equal(timeLimitForLevel(400, "v3", "grid", 36), 58_350);
+assert.equal(timeLimitForLevel(500, "v3", "grid", 32), 47_350);
+assert.ok(
+  timeLimitForLevel(200, "v3", "grid", 32)! > timeLimitForLevel(199, "v3", "grid", 30)!,
+  "第 200 关不应在增加目标与干扰项时突然缩短时间"
+);
+for (let level = 201; level <= MAX_LEVEL; level += 1) {
+  const previousPerTarget = timeLimitForLevel(level - 1, "v3", "grid")! / targetCountForLevel(level - 1);
+  const currentPerTarget = timeLimitForLevel(level, "v3", "grid")! / targetCountForLevel(level);
+  assert.ok(
+    previousPerTarget - currentPerTarget < 25,
+    `第 ${level} 关的单目标时间下降过快`
+  );
+}
 assert.equal(buildLevel(200).distractorCount, 3);
 assert.equal(buildLevel(500).totalCount, 49);
 
