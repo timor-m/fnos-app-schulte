@@ -4,7 +4,7 @@ import { fileURLToPath, URL } from "node:url";
 import templateConfig from "../../template.config.json" with { type: "json" };
 
 const appPort = Number(process.env.APP_PORT || templateConfig.localDevPort);
-const webPort = 8080 ||  Number(process.env.WEB_PORT || appPort + 1);
+const webPort = Number(process.env.WEB_PORT || appPort + 1);
 const gatewayPrefix = templateConfig.gatewayPrefix;
 
 export default defineConfig({

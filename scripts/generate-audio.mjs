@@ -63,14 +63,6 @@ function writeWav(relativePath, samples) {
   return mkdir(dirname(target), { recursive: true }).then(() => writeFile(target, buffer));
 }
 
-const tap = tone({
-  duration: 0.075,
-  frequencies: [[620, 0.75], [1_240, 0.18]],
-  wave: "triangle",
-  volume: 0.28,
-  decay: 0.045
-});
-
 const start = mix(
   [
     { data: tone({ duration: 0.18, frequencies: [[392, 0.7], [784, 0.14]], volume: 0.22, decay: 0.1 }) },
@@ -79,37 +71,7 @@ const start = mix(
   0.45
 );
 
-const error = mix(
-  [
-    { data: tone({ duration: 0.12, frequencies: [[148, 0.7], [296, 0.1]], wave: "triangle", volume: 0.2 }) },
-    { data: tone({ duration: 0.06, frequencies: [[90, 0.6]], wave: "triangle", volume: 0.12 }), offset: 0.035 }
-  ],
-  0.17
-);
-
-const complete = mix(
-  [
-    { data: tone({ duration: 0.18, frequencies: [[523, 0.75], [1_046, 0.12]], volume: 0.18, decay: 0.1 }) },
-    { data: tone({ duration: 0.18, frequencies: [[659, 0.75], [1_318, 0.12]], volume: 0.18, decay: 0.1 }), offset: 0.13 },
-    { data: tone({ duration: 0.48, frequencies: [[784, 0.72], [1_568, 0.12]], volume: 0.2, decay: 0.32 }), offset: 0.26 }
-  ],
-  0.86
-);
-
-const fail = mix(
-  [
-    { data: tone({ duration: 0.2, frequencies: [[330, 0.7], [165, 0.12]], wave: "triangle", volume: 0.17, decay: 0.12 }) },
-    { data: tone({ duration: 0.32, frequencies: [[220, 0.7], [110, 0.12]], wave: "triangle", volume: 0.16, decay: 0.22 }), offset: 0.16 }
-  ],
-  0.62
-);
-
-await Promise.all([
-  writeWav("start-chime.wav", start),
-  writeWav("tap-soft.wav", tap),
-  writeWav("error-muted.wav", error),
-  writeWav("complete-warm.wav", complete),
-  writeWav("fail-soft.wav", fail)
-]);
+// 其余音效（点按成功/失败、过关、解锁）使用 Mixkit 素材，见 packages/ui/src/game/sound.ts
+await Promise.all([writeWav("start-chime.wav", start)]);
 
 console.log("Generated local audio assets in", root);

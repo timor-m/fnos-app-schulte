@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref } from "vue";
 import { ArrowLeft, ArrowRight, Check, Copy, Crown, Home, LoaderCircle, RotateCcw, Star, TriangleAlert } from "lucide-vue-next";
 import { shapeName, type BoardShape } from "../game/levels";
-import { formatElapsed, formatPace } from "../game/format";
+import { formatElapsed, formatPace, starsFor } from "../game/format";
 import { createResultPoster } from "../game/poster";
 
 const props = defineProps<{
@@ -31,13 +31,7 @@ let shareResetTimer: number | null = null;
 onBeforeUnmount(() => {
   if (shareResetTimer !== null) window.clearTimeout(shareResetTimer);
 });
-// 星级评定：按平均每格用时，1.0s/格以内三星，1.8s/格以内两星
-const stars = computed(() => {
-  const pace = props.timeMs / props.targetCount / 1000;
-  if (pace <= 1.0) return 3;
-  if (pace <= 1.8) return 2;
-  return 1;
-});
+const stars = computed(() => starsFor(props.timeMs, props.targetCount));
 
 const starLabel = computed(() => ["继续加油", "表现出色", "眼疾手快"][stars.value - 1]);
 

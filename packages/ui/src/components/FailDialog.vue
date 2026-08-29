@@ -29,6 +29,7 @@ const emit = defineEmits<{
         </div>
         <p>已点到 <strong>{{ reached }}</strong> / {{ total }}</p>
       </div>
+      <p class="fail-cheer">{{ reached > 0 ? `再点 ${total - reached} 个就成功啦！` : "热热身，再来一次！" }}</p>
 
       <dl class="result-grid">
         <div>

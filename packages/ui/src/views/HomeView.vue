@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import { Lock, Medal, Play, RefreshCw, Timer } from "lucide-vue-next";
+import { Lock, Medal, Play, RefreshCw, Star, Timer } from "lucide-vue-next";
 import {
   LEVEL_BANDS,
   MAX_LEVEL,
@@ -19,7 +19,7 @@ import {
   loadProgress,
   markLayoutUnlockSeen
 } from "../game/storage";
-import { formatElapsed } from "../game/format";
+import { formatElapsed, starsFor } from "../game/format";
 import { fetchMe } from "../game/api";
 import LayoutUnlockDialog from "../components/LayoutUnlockDialog.vue";
 import ShapeIcon from "../components/ShapeIcon.vue";
@@ -108,6 +108,7 @@ const levels = computed(() =>
       shape,
       shapeLabel: shapeName(shape),
       best,
+      stars: best !== null ? starsFor(best, profile.targetCount) : 0,
       isFastest: fastestLevels.value.has(level),
       done: best !== null,
       locked: !isLevelUnlocked(level, doneLevels.value)
@@ -116,6 +117,9 @@ const levels = computed(() =>
 );
 
 const nextProfile = computed(() => levelProfileForLevel(nextLevel.value));
+
+/** 集星总数：由每关最佳成绩换算，满星 3 × 500 */
+const totalStars = computed(() => levels.value.reduce((sum, item) => sum + item.stars, 0));
 
 function playMissedUnlock() {
   if (!missedUnlock.value) return;
@@ -232,6 +236,11 @@ onBeforeUnmount(() => {
         <div class="hero-stats">
           <span>已完成 <strong>{{ doneCount }}</strong> / {{ MAX_LEVEL }} 关</span>
           <span class="dot" aria-hidden="true"></span>
+          <span class="hero-stars-total" title="按每关最佳成绩换算的星级总和">
+            <Star :size="13" fill="currentColor" :stroke-width="0" aria-hidden="true" />
+            <strong>{{ totalStars }}</strong> / {{ MAX_LEVEL * 3 }}
+          </span>
+          <span class="dot" aria-hidden="true"></span>
           <span>当前进度 <strong>第 {{ progress }} 关</strong></span>
         </div>
       </div>
@@ -286,9 +295,22 @@ onBeforeUnmount(() => {
           :aria-label="item.locked ? `第 ${item.level} 关，未解锁` : `第 ${item.level} 关，${item.shapeLabel}，${item.targetCount} 个数字，${item.distractorCount} 个字母干扰`"
           @click="onLevelTap(item)"
         >
+          <span v-if="item.done" class="lc-stars" :aria-label="`${item.stars} 星`">
+            <Star
+              v-for="n in 3"
+              :key="n"
+              :size="8"
+              :fill="n <= item.stars ? 'currentColor' : 'none'"
+              :stroke-width="2.6"
+              :class="{ earned: n <= item.stars }"
+              aria-hidden="true"
+            />
+          </span>
           <span class="lc-top">
-            <span class="level-num">{{ item.level }}</span>
-            <ShapeIcon :shape="item.shape" :size="13" class="lc-shape" />
+            <span class="lc-id">
+              <span class="level-num">{{ item.level }}</span>
+              <ShapeIcon :shape="item.shape" :size="13" class="lc-shape" />
+            </span>
           </span>
           <span class="lc-bottom">
             <template v-if="item.locked">

@@ -121,6 +121,12 @@ docs/FNOS_DEVELOPMENT.md  官方开发规范摘要与发布清单
 dist/                     发布产物
 ```
 
+## 交流群
+
+使用问题、功能建议和玩法反馈都可以在 QQ 群里讨论，群号：1016244594。
+
+<img src="snapshots/qq.jpg" alt="FN舒尔特训练 QQ 交流群二维码" width="260">
+
 ## 官方资料
 
 - [飞牛应用开发者平台](https://developer.fnnas.com/docs/guide/)
