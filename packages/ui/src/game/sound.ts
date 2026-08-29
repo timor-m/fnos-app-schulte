@@ -1,13 +1,14 @@
-import completeUrl from "../assets/audio/complete-warm.wav";
-import errorUrl from "../assets/audio/error-muted.wav";
-import failUrl from "../assets/audio/fail-soft.wav";
+// 点击成功/失败/过关音效来自 Mixkit（免费商用许可，无需署名）：
+// https://mixkit.co/free-sound-effects/game/ （2069 coin / 2569 negative / 2059 level completed）
+import completeUrl from "../assets/audio/sfx-complete.mp3";
+import correctUrl from "../assets/audio/sfx-correct.mp3";
+import failUrl from "../assets/audio/sfx-fail.mp3";
 import startUrl from "../assets/audio/start-chime.wav";
+import unlockUrl from "../assets/audio/sfx-unlock.mp3";
+import wrongUrl from "../assets/audio/sfx-wrong.mp3";
 
 let audioContext: AudioContext | null = null;
 let resumePromise: Promise<boolean> | null = null;
-let tapOscillator: OscillatorNode | null = null;
-let tapGain: GainNode | null = null;
-let tapVoiceContext: AudioContext | null = null;
 const bufferCache = new Map<string, AudioBuffer>();
 const bufferPromises = new Map<string, Promise<AudioBuffer | null>>();
 
@@ -91,32 +92,6 @@ function tone(frequency: number, durationMs: number, type: OscillatorType, gainV
   });
 }
 
-function scheduleTap(ctx: AudioContext, step: number): void {
-  try {
-    if (!tapOscillator || !tapGain || tapVoiceContext !== ctx) {
-      tapOscillator?.disconnect();
-      tapGain?.disconnect();
-      tapOscillator = ctx.createOscillator();
-      tapGain = ctx.createGain();
-      tapVoiceContext = ctx;
-      tapOscillator.type = "sine";
-      tapGain.gain.value = 0.0001;
-      tapOscillator.connect(tapGain).connect(ctx.destination);
-      tapOscillator.start();
-    }
-
-    const now = ctx.currentTime;
-    tapOscillator.frequency.setValueAtTime(420 + Math.min(step, 60) * 8, now);
-    tapGain.gain.cancelScheduledValues(now);
-    tapGain.gain.setValueAtTime(0.08, now);
-    tapGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
-  } catch {
-    tapOscillator = null;
-    tapGain = null;
-    tapVoiceContext = null;
-  }
-}
-
 function loadBuffer(ctx: AudioContext, url: string): Promise<AudioBuffer | null> {
   const cached = bufferCache.get(url);
   if (cached) return Promise.resolve(cached);
@@ -183,7 +158,7 @@ function sample(url: string, volume: number, fallback: () => void, playbackRate 
 function preloadSamples(): void {
   const ctx = getContext();
   if (!ctx) return;
-  for (const url of [startUrl, errorUrl, completeUrl, failUrl]) {
+  for (const url of [startUrl, correctUrl, wrongUrl, completeUrl, failUrl, unlockUrl]) {
     void loadBuffer(ctx, url);
   }
 }
@@ -201,20 +176,12 @@ export function unlockAudio(): void {
   }
 }
 
-export function playTap(step: number): void {
-  const ctx = getContext();
-  if (!ctx) return;
-  if (ctx.state === "running") {
-    scheduleTap(ctx, step);
-    return;
-  }
-  void ensureRunning(ctx).then((ready) => {
-    if (ready) scheduleTap(ctx, step);
-  });
+export function playTap(): void {
+  sample(correctUrl, 0.5, () => tone(620, 90, "triangle", 0.1));
 }
 
 export function playError(): void {
-  sample(errorUrl, 0.42, () => tone(180, 160, "triangle", 0.1));
+  sample(wrongUrl, 0.5, () => tone(180, 160, "triangle", 0.1));
 }
 
 export function playComplete(): void {
@@ -232,9 +199,22 @@ export function playFail(): void {
   });
 }
 
+/** 新布局解锁弹窗音 */
+export function playUnlock(): void {
+  sample(unlockUrl, 0.5, () => {
+    tone(523, 140, "sine", 0.1);
+    window.setTimeout(() => tone(784, 200, "sine", 0.1), 120);
+  });
+}
+
 export function playStart(): void {
   sample(startUrl, 0.5, () => {
     tone(392, 140, "sine", 0.08);
     window.setTimeout(() => tone(523, 180, "sine", 0.08), 120);
   });
+}
+
+/** 限时最后几秒的滴答提示音 */
+export function playTick(): void {
+  tone(1046.5, 70, "sine", 0.07);
 }

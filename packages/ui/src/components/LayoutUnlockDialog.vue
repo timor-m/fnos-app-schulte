@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { inject, onMounted } from "vue";
 import { ArrowRight, Home, Sparkles } from "lucide-vue-next";
 import BoardRenderer from "./BoardRenderer.vue";
 import { buildLevel, canonicalSeed, type LayoutUnlock } from "../game/levels";
+import { playUnlock } from "../game/sound";
+import type { GameSettings } from "../game/storage";
 
 const props = defineProps<{ unlock: LayoutUnlock }>();
 const emit = defineEmits<{
@@ -9,7 +12,17 @@ const emit = defineEmits<{
   (event: "later"): void;
 }>();
 
+const settings = inject<GameSettings>("settings")!;
 const previewSpec = buildLevel(props.unlock.level, canonicalSeed(props.unlock.level));
+
+onMounted(() => {
+  if (!settings.sound) return;
+  try {
+    playUnlock();
+  } catch {
+    // 音频不可用时静默降级
+  }
+});
 </script>
 
 <template>

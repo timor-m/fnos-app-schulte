@@ -40,12 +40,14 @@ import {
   playFail,
   playStart,
   playTap,
+  playTick,
   unlockAudio
 } from "../game/sound";
 import { fetchLevelBoard, submitRecord } from "../game/api";
 import CompleteDialog from "../components/CompleteDialog.vue";
 import FailDialog from "../components/FailDialog.vue";
 import BoardRenderer from "../components/BoardRenderer.vue";
+import EffectsCanvas from "../components/EffectsCanvas.vue";
 import LayoutUnlockDialog from "../components/LayoutUnlockDialog.vue";
 import CopyLinkDialog from "../components/CopyLinkDialog.vue";
 
@@ -75,6 +77,7 @@ const spec = ref(buildLevel(props.level, currentSeed.value, props.ruleset));
 
 const target = ref(1);
 const errors = ref(0);
+const streak = ref(0);
 const elapsed = ref(0);
 const started = ref(false);
 const paused = ref(false);
@@ -88,12 +91,13 @@ const shared = ref(false);
 const unlockOpen = ref(false);
 const shareFallbackUrl = ref<string | null>(null);
 const shareButton = ref<HTMLButtonElement | null>(null);
+const effectsLayer = ref<InstanceType<typeof EffectsCanvas> | null>(null);
 
 let timer: number | null = null;
 let startedAt = 0;
 let accumulated = 0;
 let tapSoundFrame: number | null = null;
-let pendingTapSound = 0;
+let lastTickSecond = -1;
 
 const best = ref<number | null>(bestTime(props.level, props.ruleset));
 const timeLimit = spec.value.timeLimitMs;
@@ -112,8 +116,18 @@ const ready = computed(() => !started.value && !finished.value && !failed.value)
 
 function tick() {
   elapsed.value = accumulated + (performance.now() - startedAt);
-  if (timeLimit !== null && elapsed.value >= timeLimit && !finished.value && !failed.value) {
-    fail();
+  if (timeLimit !== null && !finished.value && !failed.value) {
+    const remainMs = timeLimit - elapsed.value;
+    if (remainMs > 0 && remainMs <= 5000) {
+      const second = Math.ceil(remainMs / 1000);
+      if (second !== lastTickSecond) {
+        lastTickSecond = second;
+        safeSound(playTick);
+      }
+    }
+    if (elapsed.value >= timeLimit) {
+      fail();
+    }
   }
 }
 
@@ -168,13 +182,12 @@ function safeSound(play: () => void) {
   }
 }
 
-function queueTapSound(step: number) {
+function queueTapSound() {
   if (!settings.sound) return;
-  pendingTapSound = step;
   if (tapSoundFrame !== null) return;
   tapSoundFrame = window.requestAnimationFrame(() => {
     tapSoundFrame = null;
-    safeSound(() => playTap(pendingTapSound));
+    safeSound(playTap);
   });
 }
 
@@ -183,9 +196,11 @@ function cancelTapSound() {
   tapSoundFrame = null;
 }
 
-function markWrong(cell: CellSpec) {
+function markWrong(cell: CellSpec, point: { x: number; y: number }) {
   errors.value += 1;
+  streak.value = 0;
   wrongId.value = cell.id;
+  effectsLayer.value?.wrong(point.x, point.y);
   safeSound(playError);
   vibrate(30);
   window.setTimeout(() => {
@@ -193,7 +208,7 @@ function markWrong(cell: CellSpec) {
   }, 350);
 }
 
-function tapCell(cell: CellSpec) {
+function tapCell(cell: CellSpec, point: { x: number; y: number }) {
   if (!started.value || paused.value || finished.value || failed.value) return;
   if (timeLimit !== null && accumulated + (performance.now() - startedAt) >= timeLimit) {
     tick();
@@ -201,18 +216,24 @@ function tapCell(cell: CellSpec) {
   }
 
   if (cell.kind === "distractor") {
-    markWrong(cell);
+    markWrong(cell, point);
     return;
   }
 
   if (cell.sequenceValue === target.value) {
     target.value += 1;
-    queueTapSound(target.value - 1);
+    streak.value += 1;
+    queueTapSound();
+    effectsLayer.value?.burst(point.x, point.y, cell.bg, cell.label);
+    if (streak.value % 5 === 0) {
+      effectsLayer.value?.combo(point.x, point.y, `连击 x${streak.value}`);
+    }
     if (target.value > total.value) {
       finish();
     }
-  } else if ((cell.sequenceValue ?? 0) > target.value) {
-    markWrong(cell);
+  } else {
+    // 点大了或回头点已完成的数字，都算作失误并给出反馈
+    markWrong(cell, point);
   }
 }
 
@@ -280,6 +301,7 @@ function resetState() {
   cancelTapSound();
   target.value = 1;
   errors.value = 0;
+  streak.value = 0;
   elapsed.value = 0;
   accumulated = 0;
   started.value = false;
@@ -290,6 +312,7 @@ function resetState() {
   isNewBest.value = false;
   isLevelBest.value = false;
   wrongId.value = null;
+  lastTickSecond = -1;
 }
 
 /** 重新开始：方案不变，只清零进度 */
@@ -491,6 +514,7 @@ onBeforeUnmount(() => {
           <p>已暂停</p>
           <button type="button" class="resume-btn" @click="togglePause"><Play :size="16" fill="currentColor" />继续</button>
         </div>
+        <EffectsCanvas ref="effectsLayer" />
       </div>
     </section>
 

@@ -14,7 +14,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  (event: "select", cell: CellSpec): void;
+  (event: "select", cell: CellSpec, point: { x: number; y: number }): void;
 }>();
 
 const columns = computed(() => Math.ceil(Math.sqrt(props.spec.totalCount)));
@@ -51,36 +51,44 @@ function nodeTransform(cell: CellSpec): string {
   return `rotate(${cell.nodeRotation} ${cell.x} ${cell.y})`;
 }
 
-function selectOnce(cell: CellSpec) {
+function eventPoint(event: PointerEvent | TouchEvent): { x: number; y: number } | null {
+  const point = "changedTouches" in event ? event.changedTouches[0] : event;
+  if (!point) return null;
+  return { x: point.clientX, y: point.clientY };
+}
+
+function selectOnce(cell: CellSpec, point: { x: number; y: number }) {
   if (!props.active || props.paused || props.preview) return;
   const now = performance.now();
   // 部分 WebView 会为同一次触摸同时派发 pointerdown 与 touchstart。
   if (cell.id === lastSelectionId && now - lastSelectionAt < 320) return;
   lastSelectionId = cell.id;
   lastSelectionAt = now;
-  emit("select", cell);
+  emit("select", cell, point);
 }
 
 function selectGrid(event: PointerEvent | TouchEvent) {
   if (!props.active || props.paused || props.preview) return;
   if (event.cancelable) event.preventDefault();
+  const point = eventPoint(event);
+  if (!point) return;
   const target = event.target as Element | null;
   const rawIndex = target?.closest<HTMLElement>("[data-cell-index]")?.dataset.cellIndex;
   const index = rawIndex === undefined ? -1 : Number(rawIndex);
   const cell = props.spec.cells[index];
-  if (cell) selectOnce(cell);
+  if (cell) selectOnce(cell, point);
 }
 
 function selectVector(event: PointerEvent | TouchEvent) {
   if (!props.active || props.paused || props.preview) return;
   if (event.cancelable) event.preventDefault();
 
-  const point = "changedTouches" in event ? event.changedTouches[0] : event;
+  const point = eventPoint(event);
   const svg = event.currentTarget as SVGSVGElement;
   if (!point || !svg) return;
   const rect = svg.getBoundingClientRect();
-  const x = ((point.clientX - rect.left) / rect.width) * 1000;
-  const y = ((point.clientY - rect.top) / rect.height) * 1000;
+  const x = ((point.x - rect.left) / rect.width) * 1000;
+  const y = ((point.y - rect.top) / rect.height) * 1000;
 
   let nearest: CellSpec | null = null;
   let nearestDistance = Number.POSITIVE_INFINITY;
@@ -92,7 +100,7 @@ function selectVector(event: PointerEvent | TouchEvent) {
     }
   }
   if (nearest && nearestDistance <= Math.max(66, nearest.visualRadius * 1.05)) {
-    selectOnce(nearest);
+    selectOnce(nearest, point);
   }
 }
 </script>
