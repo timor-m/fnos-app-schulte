@@ -46,18 +46,35 @@ jobs:
           node -e '
             const fs = require("fs");
             const cfg = JSON.parse(fs.readFileSync("template.config.json", "utf8"));
-            const notes = cfg.releaseNotes || {};
+            const version = process.env.VERSION.replace(/^v/, "");
+            const changelogLines = fs.readFileSync("CHANGELOG.md", "utf8").split(/\r?\n/);
+            const start = changelogLines.findIndex((l) => l.trim() === `## ${version}` || l.startsWith(`## ${version} `));
+            let changelogBody = "";
+            if (start !== -1) {
+              let end = changelogLines.findIndex((l, i) => i > start && l.startsWith("## "));
+              if (end === -1) end = changelogLines.length;
+              changelogBody = changelogLines.slice(start + 1, end).join("\n").trim();
+            }
             const lines = [
               `# ${cfg.appTitle} ${process.env.VERSION}`,
               "",
-              "## Summary",
-              "",
-              `- ${notes.summary || cfg.appDescription}`,
-              "",
-              "## Highlights",
-              "",
-              ...(notes.highlights || []).map((h) => `- ${h}`),
-              "",
+            ];
+            if (changelogBody) {
+              lines.push(changelogBody, "");
+            } else {
+              const notes = cfg.releaseNotes || {};
+              lines.push(
+                "## Summary",
+                "",
+                `- ${notes.summary || cfg.appDescription}`,
+                "",
+                "## Highlights",
+                "",
+                ...((notes.highlights || []).map((h) => `- ${h}`)),
+                ""
+              );
+            }
+            lines.push(
               "## Release Artifacts",
               "",
               "- `dist/app.tgz`: fnOS app payload archive",
@@ -67,8 +84,8 @@ jobs:
               "",
               "- Generated from GitHub Actions",
               "- Version source: `package.json`",
-              "- Release notes source: `template.config.json` 的 releaseNotes 字段"
-            ];
+              "- Release notes source: `CHANGELOG.md` 对应版本章节（缺失时回退 `template.config.json` 的 releaseNotes）"
+            );
             fs.writeFileSync("RELEASE_NOTES.md", lines.join("\n") + "\n");
           '
 
