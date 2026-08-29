@@ -1,11 +1,29 @@
 # Changelog
 
-## Unreleased
+本项目遵循语义化版本。
 
-- Align the package with the official fnOS unified gateway model
-- Replace the CGI port proxy with a Unix Socket Nitro launcher
-- Add gateway user context helpers and package validation
-- Update fnpack to 1.2.3 and document the official development workflow
+## 1.0.6
+
+### Added
+
+- 新增 Canvas 点按特效层：点对触发扩散光环、火花和飘起的数字，点错触发红色碎裂反馈，每 5 连击飘出“连击 xN”；特效层叠加在游戏界面上方且不拦截任何交互，并尊重系统“减弱动态效果”设置。
+- 新增集星系统：每关按最佳成绩换算 1-3 星（1.0 秒/格满星、1.8 秒/格两星），关卡格子右上角显示星级，主页顶部展示总星数（X / 1500），过关弹窗同步展示本关星级；星级由已有成绩实时换算，无需额外存储。
+- 关于弹窗新增 QQ 交流群入口，点击即可复制群号；README 增加交流群章节与群二维码。
+
+### Changed
+
+- 游戏音效全面替换为真实素材：点对为简短泡泡音、点错为低沉提示音、限时失败为消极吉他音、过关为胜利号角、解锁新布局时播放专属提示音；限时关最后 5 秒保留滴答提示。
+- 关卡格子的星级改为右上角小号绝对定位显示，不再与关卡数字、最快用时和奖牌重叠。
+- 限时失败弹窗增加“再点 X 个就成功啦！”鼓励提示，告诉孩子差多少就能过关。
+
+### Fixed
+
+- 修复回头点按已完成数字时毫无反馈的问题，现在同样计为失误并播放错误反馈。
+
+### Removed
+
+- 移除游玩过程中的里程碑文字提示（“好的开始！”等），保持界面专注。
+- 移除早期程序化合成的音效文件，统一使用真实音频素材。
 
 ## 0.1.0
 

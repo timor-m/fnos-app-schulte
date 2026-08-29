@@ -1,6 +1,6 @@
 {
   "name": "fnos-app-schulte",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "舒尔特注意力训练游戏（fnOS Native 应用）",
   "type": "module",
   "workspaces": [
