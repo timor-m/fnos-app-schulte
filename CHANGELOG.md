@@ -4,8 +4,10 @@
 
 ## 1.0.7
 
+- Keep home hero statistics readable on narrow screens by allowing metric groups to wrap without splitting their values.
 - Reorganize README deployment, development, verification, and documentation entry points.
 - Keep the Docker image name aligned with the existing repository and fnOS package identity.
+- Fix Release metadata generation to read the GitHub ref and optional Docker image variable reliably.
 
 ## Unreleased
 

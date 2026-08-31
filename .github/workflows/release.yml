@@ -20,11 +20,14 @@ jobs:
       - uses: actions/checkout@v4
       - id: meta
         shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
+          DOCKERHUB_IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
         run: |
           node -e '
             const fs = require("fs");
             const cfg = JSON.parse(fs.readFileSync("template.config.json", "utf8"));
-            const version = process.env.VERSION.replace(/^v/, "");
+            const version = (process.env.VERSION || require("./package.json").version).replace(/^v/, "");
             const changelogLines = fs.readFileSync("CHANGELOG.md", "utf8").split(/\r?\n/);
             const start = changelogLines.findIndex((l) => l.trim() === `## ${version}` || l.startsWith(`## ${version} `));
             let changelogBody = "";
@@ -34,7 +37,7 @@ jobs:
               changelogBody = changelogLines.slice(start + 1, end).join("\n").trim();
             }
             const lines = [
-              `# ${cfg.appTitle} ${process.env.VERSION}`,
+              `# ${cfg.appTitle} v${version}`,
               "",
             ];
             if (changelogBody) {
@@ -56,7 +59,7 @@ jobs:
               "## Release Artifacts",
               "",
               "- `dist/app.tgz`: fnOS app payload archive",
-              `- \`dist/${process.env.PACKAGE_FILE}\`: installable fnOS package`,
+              `- \`dist/${cfg.appName}-${version}.fpk\`: installable fnOS package`,
               "",
               "## Notes",
               "",
