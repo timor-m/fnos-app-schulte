@@ -2,46 +2,24 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
-  release:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      image: ${{ steps.meta.outputs.image }}
+      package_file: ${{ steps.meta.outputs.package_file }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Download fnpack
-        run: npm run download:fnpack
-
-      - name: Pack fpk
-        run: npm run pack:fpk
-
-      - name: Read app meta
-        id: meta
-        run: |
-          echo "title=$(node -p 'require("./template.config.json").appTitle')" >> "$GITHUB_OUTPUT"
-          echo "package_name=$(node -p 'require("./package.json").name')" >> "$GITHUB_OUTPUT"
-          echo "package_version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
-          echo "package_file=$(node -p 'const p=require("./package.json"); `${p.name}-${p.version}.fpk`')" >> "$GITHUB_OUTPUT"
-
-      - name: Prepare release notes
+      - id: meta
         shell: bash
-        env:
-          VERSION: ${{ github.ref_name }}
-          PACKAGE_FILE: ${{ steps.meta.outputs.package_file }}
         run: |
           node -e '
             const fs = require("fs");
@@ -88,13 +66,115 @@ jobs:
             );
             fs.writeFileSync("RELEASE_NOTES.md", lines.join("\n") + "\n");
           '
+          version="$(node -p 'require("./package.json").version')"
+          name="$(node -p 'require("./package.json").name')"
+          image="${DOCKERHUB_IMAGE:-timorm/fnos-app-schulte}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "image=docker.io/$image" >> "$GITHUB_OUTPUT"
+          echo "package_file=$name-$version.fpk" >> "$GITHUB_OUTPUT"
+          if [[ "${GITHUB_REF_NAME#v}" != "$version" && "$GITHUB_REF_TYPE" == tag ]]; then exit 1; fi
 
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+  validate:
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  fpk:
+    runs-on: ubuntu-latest
+    needs: [prepare, validate]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run download:fnpack
+      - run: npm run pack:fpk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fpk-${{ needs.prepare.outputs.version }}
+          path: |
+            dist/app.tgz
+            dist/${{ needs.prepare.outputs.package_file }}
+          if-no-files-found: error
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [prepare, validate]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ needs.prepare.outputs.image }}
+          tags: |
+            type=raw,value=${{ needs.prepare.outputs.version }}
+            type=raw,value=v${{ needs.prepare.outputs.version }}
+            type=sha,format=short
+            type=raw,value=latest,enable=${{ !contains(needs.prepare.outputs.version, '-') }}
+      - uses: docker/build-push-action@v6
+        id: build
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ needs.prepare.outputs.version }}
+            GATEWAY_PREFIX=/
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          sbom: true
+          provenance: mode=max
+      - run: echo "digest=${{ steps.build.outputs.digest }}" > docker-digest.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-${{ needs.prepare.outputs.version }}
+          path: docker-digest.txt
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [prepare, fpk, docker]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: fpk-${{ needs.prepare.outputs.version }}
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: docker-${{ needs.prepare.outputs.version }}
+          path: .
+      - name: Prepare release notes
+        run: |
+          cat > RELEASE_NOTES.md <<EOF
+          # 舒尔特训练 ${{ github.ref_name }}
+
+          ## Release Artifacts
+          - `dist/${{ needs.prepare.outputs.package_file }}`
+          - Docker: `${{ needs.prepare.outputs.image }}:${{ needs.prepare.outputs.version }}`
+          - Docker digest: `$(cat docker-digest.txt)`
+
+          FPK 使用 fnOS 网关账号；Docker 使用独立本地账号体系。
+          EOF
+      - uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          name: ${{ steps.meta.outputs.title }} ${{ github.ref_name }}
           body_path: RELEASE_NOTES.md
           files: |
             dist/app.tgz
-            dist/${{ steps.meta.outputs.package_file }}
+            dist/${{ needs.prepare.outputs.package_file }}

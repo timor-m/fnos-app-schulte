@@ -9,7 +9,8 @@ function isEmbeddedWebView(): boolean {
   const appShell = /(?:Electron|WebView|fnOS|Trim)/i.test(ua);
 
   try {
-    return androidWebView || iosWebView || appShell || window.self !== window.top;
+    // iframe 也可能只是浏览器预览容器，不能据此关闭游戏动效；fnOS 使用专属 UA/壳标识判断。
+    return androidWebView || iosWebView || appShell;
   } catch {
     return true;
   }

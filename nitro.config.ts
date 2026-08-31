@@ -2,7 +2,7 @@ import templateConfig from "./template.config.json" with { type: "json" };
 
 export default defineNitroConfig({
   preset: "node-middleware",
-  baseURL: `${templateConfig.gatewayPrefix}/`,
+  baseURL: `${(process.env.GATEWAY_PREFIX || templateConfig.gatewayPrefix).replace(/\/$/, "")}/`,
   serverDir: "packages/server",
   output: {
     dir: ".server-dist"

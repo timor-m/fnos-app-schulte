@@ -9,6 +9,7 @@ export type AppRuntimeConfig = {
   logLevel: string;
   logDir: string;
   storageDir: string;
+  authMode: "fnos" | "local" | "development";
 };
 
 export function getAppConfig(): AppRuntimeConfig {
@@ -24,6 +25,7 @@ export function getAppConfig(): AppRuntimeConfig {
       : Number(process.env.NITRO_PORT || process.env.PORT || templateConfig.localDevPort),
     logLevel: process.env.LOG_LEVEL || templateConfig.logLevel,
     logDir: process.env.LOG_DIR || `/var/apps/${appName}/var/log`,
-    storageDir: process.env.STORAGE_DIR || `/var/apps/${appName}/var/data`
+    storageDir: process.env.STORAGE_DIR || `/var/apps/${appName}/var/data`,
+    authMode: process.env.NODE_ENV === "development" ? "development" : (process.env.AUTH_MODE === "local" ? "local" : "fnos")
   };
 }

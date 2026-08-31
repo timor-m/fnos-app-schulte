@@ -73,11 +73,35 @@ export type SessionInfo = {
   uid: string | null;
   username: string | null;
   isAdmin: boolean;
+  guest?: boolean;
+  authMode?: "local" | "fnos";
 };
 
 export function fetchSession(): Promise<SessionInfo | null> {
   return get<SessionInfo>("session");
 }
+
+export async function login(username: string, password: string): Promise<boolean> {
+  const res = await fetch(apiUrl("auth/login"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username, password }) });
+  return res.ok && Boolean((await res.json() as Envelope<unknown>).ok);
+}
+
+export async function logout(): Promise<void> { await fetch(apiUrl("auth/logout"), { method: "POST" }); }
+
+export async function changePassword(password: string): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const res = await fetch(apiUrl("auth/password"), { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ password }) });
+    const body = await res.json() as Envelope<unknown> & { error?: { message?: string } };
+    return { ok: res.ok && Boolean(body.ok), message: body.error?.message };
+  } catch {
+    return { ok: false, message: "服务暂时不可用" };
+  }
+}
+export type LocalAccount = { uid: string; username: string; mustChangePassword: boolean; disabledAt: number | null };
+export async function fetchAccounts(): Promise<LocalAccount[]> { return (await get<LocalAccount[]>("auth/accounts")) ?? []; }
+export async function createAccount(username: string): Promise<boolean> { const r=await fetch(apiUrl("auth/accounts"),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username})}); return r.ok && Boolean((await r.json() as Envelope<unknown>).ok); }
+export async function resetAccount(uid: string): Promise<boolean> { const r=await fetch(apiUrl("auth/accounts/reset"),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({uid})}); return r.ok && Boolean((await r.json() as Envelope<unknown>).ok); }
+export async function deleteAccount(uid: string): Promise<{ ok: boolean; message?: string }> { try { const r=await fetch(apiUrl("auth/accounts/delete"),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({uid})}); const body=await r.json() as Envelope<unknown> & {error?:{message?:string}}; return {ok:r.ok&&Boolean(body.ok),message:body.error?.message}; } catch { return {ok:false,message:"服务暂时不可用"}; } }
 
 export function fetchMyPlays(cursor: number): Promise<{ plays: PlayItem[]; nextCursor: number | null } | null> {
   return get<{ plays: PlayItem[]; nextCursor: number | null }>(`me-plays?cursor=${cursor}`);

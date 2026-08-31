@@ -12,6 +12,8 @@ import ConfirmDialog from "./components/ConfirmDialog.vue";
 import { clampLevel, canonicalSeed, parseSeed, type Ruleset } from "./game/levels";
 import { clearAllData, loadSettings, saveSettings, type GameSettings, DEFAULT_SETTINGS } from "./game/storage";
 import { fetchSession } from "./game/api";
+import LoginView from "./views/LoginView.vue";
+import AccountDialog from "./components/AccountDialog.vue";
 import { preloadAudio } from "./game/sound";
 import appIcon from "./assets/app-icon.png";
 
@@ -24,6 +26,11 @@ type LeaderboardState = { scope: "overall" | "level"; level: number };
 const view = ref<View>("home");
 const target = ref<GameTarget>({ level: 1, seed: null, ruleset: "v3", autoStart: false });
 const username = ref<string | null>(null);
+const sessionReady = ref(false);
+const requiresLogin = ref(false);
+const accountOpen = ref(false);
+const isAdmin = ref(false);
+const authMode = ref<"local" | "fnos" | null>(null);
 const settingsOpen = ref(false);
 const aboutOpen = ref(false);
 const clearConfirmOpen = ref(false);
@@ -52,12 +59,21 @@ function openAbout() {
   aboutOpen.value = true;
 }
 
+function openAccount() {
+  settingsOpen.value = false;
+  accountOpen.value = true;
+}
+
 function openClearConfirm() {
   clearConfirmOpen.value = true;
 }
 
 function clearLocalData() {
   clearAllData();
+  window.location.reload();
+}
+
+function reloadPage() {
   window.location.reload();
 }
 
@@ -213,11 +229,16 @@ onMounted(async () => {
 
   const session = await fetchSession();
   username.value = session?.username ?? null;
+  authMode.value = session?.authMode ?? null;
+  requiresLogin.value = Boolean(session?.authMode === "local" && !session.authenticated);
+  isAdmin.value = Boolean(session?.isAdmin);
+  sessionReady.value = true;
 });
 </script>
 
 <template>
-  <div class="app-shell">
+  <LoginView v-if="sessionReady && requiresLogin" @success="reloadPage" />
+  <div v-else-if="sessionReady" class="app-shell">
     <header class="topbar">
       <button class="brand" type="button" @click="goHome">
         <img class="brand-mark" :src="appIcon" alt="舒尔特训练" width="34" height="34" />
@@ -280,12 +301,16 @@ onMounted(async () => {
       v-if="settingsOpen"
       :settings="settings"
       :inactive="aboutOpen || clearConfirmOpen"
+      :local-account="authMode === 'local'"
+      :username="username"
       @update="updateSettings"
       @about="openAbout"
+      @account="openAccount"
       @clear="openClearConfirm"
       @close="settingsOpen = false"
     />
     <AboutDialog v-if="aboutOpen" @close="aboutOpen = false" />
+    <AccountDialog v-if="accountOpen" :is-admin="isAdmin" @close="accountOpen = false" @logout="reloadPage" />
     <ConfirmDialog
       v-if="clearConfirmOpen"
       title="清理本机缓存？"

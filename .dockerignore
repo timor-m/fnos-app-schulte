@@ -1,0 +1,12 @@
+.git
+.data
+.fnos-build
+.server-dist
+.ui-dist
+node_modules
+dist
+tools/fnpack
+snapshots
+*.fpk
+*.tgz
+.DS_Store

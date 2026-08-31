@@ -1,6 +1,15 @@
 # 舒尔特训练
 
-基于 fnOS App Template（Vue 3 + Nitro）构建的舒尔特注意力训练游戏，通过飞牛统一网关访问，复用 NAS 登录态。
+基于 fnOS App Template（Vue 3 + Nitro）构建的舒尔特注意力训练游戏。支持 fnOS 网关账号运行，也支持 Docker 独立本地账号部署；两种模式互不影响。
+
+## Docker 快速开始
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+访问 `http://服务器地址:3333/`，默认账号为 `admin/admin`，首次登录后需修改密码。数据保存在 `schulte-data` 卷；可用 `DATA_HOST_PATH=/mnt/nas/schulte-data` 指定主机目录。完整说明见 `docs/DOCKER_DEPLOYMENT.md`。
 
 仓库地址：[github.com/timor-m/fnos-app-schulte](https://github.com/timor-m/fnos-app-schulte)
 
@@ -14,7 +23,7 @@
 - 关卡分享链接直达：`/app/fnos-app-schulte/?level=12`，自定义局面带种子参数 `&s=…`
 - 家庭排行榜：总榜（通关数 + 平均成绩）与单关榜（按最佳用时），领奖台式前三名展示
 - 我的页面：段位进度、已通关/累计完成/近 7 天/平均成绩统计与最近成绩列表
-- 用户身份直接复用飞牛统一网关（`X-Trim-*` 头），成绩按 NAS 用户存档到服务端 SQLite（`node:sqlite`），本机 localStorage 作为离线兜底
+- fnOS 版本复用飞牛统一网关（`X-Trim-*` 头），Docker 版本使用独立本地账号和 Cookie 会话；两种模式的成绩都存档到服务端 SQLite（`node:sqlite`），本机 localStorage 作为离线兜底
 - 全面适配桌面与移动端
 
 设计与运营建议（难度曲线、管理面板路线图、响应式策略）见 [docs/SCHULTE-DESIGN.md](docs/SCHULTE-DESIGN.md)。
@@ -32,6 +41,20 @@
 | 花瓣布局 | 通关结算 | 家庭排行榜 | 我的训练档案 |
 | --- | --- | --- | --- |
 | <img src="snapshots/game-petal.png" width="200" alt="花瓣布局对局" /> | <img src="snapshots/win.png" width="200" alt="通关结算" /> | <img src="snapshots/leaderboard.png" width="200" alt="家庭排行榜" /> | <img src="snapshots/profile.png" width="200" alt="我的训练档案" /> |
+
+## Docker 部署
+
+Docker 需要 Docker Engine 24+ 和 Compose v2。在存放 `docker-compose.yml` 的目录执行：
+
+```bash
+docker compose pull
+docker compose up -d
+docker compose ps
+```
+
+访问 `http://服务器地址:3333/`，首次登录使用 `admin/admin`。管理员新增账号后的临时密码也是 `admin`；登录后应立即通过账号密码接口修改密码。数据和账号存放在 `schulte-data` 命名卷，迁移到主机目录时在 `.env` 设置 `DATA_HOST_PATH=/mnt/nas/schulte-data`。升级时固定 `SCHULTE_VERSION`，不要长期使用 `latest`。
+
+Docker 本地账号只存在于 Docker 数据库，不会读取或修改 fnOS 网关账号。fnOS `.fpk` 仍从应用中心安装，继续通过 Unix Socket 使用 fnOS 登录态。
 
 ## 环境要求
 

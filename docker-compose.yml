@@ -1,0 +1,26 @@
+services:
+  schulte:
+    image: docker.io/${DOCKERHUB_IMAGE:-timorm/fnos-app-schulte}:${SCHULTE_VERSION:-latest}
+    build:
+      context: .
+      args:
+        APP_VERSION: ${SCHULTE_VERSION:-local}
+        GATEWAY_PREFIX: /
+    container_name: fnos-app-schulte
+    restart: unless-stopped
+    ports:
+      - "${SCHULTE_PORT:-3333}:3333"
+    environment:
+      AUTH_MODE: local
+      GATEWAY_PREFIX: /
+      HOST: 0.0.0.0
+      PORT: 3333
+      STORAGE_DIR: /data
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - ${DATA_HOST_PATH:-schulte-data}:/data
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  schulte-data:
+    name: fnos-app-schulte-data

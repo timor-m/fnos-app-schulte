@@ -6,6 +6,8 @@ import type { GameSettings } from "../game/storage";
 const props = defineProps<{
   settings: GameSettings;
   inactive: boolean;
+  localAccount?: boolean;
+  username?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -13,6 +15,7 @@ const emit = defineEmits<{
   (e: "about"): void;
   (e: "clear"): void;
   (e: "close"): void;
+  (e: "account"): void;
 }>();
 
 const closeButton = ref<HTMLButtonElement | null>(null);
@@ -103,6 +106,17 @@ function requestAbout() {
         </div>
         <button ref="clearButton" type="button" class="btn danger" @click="requestClear"><Trash2 :size="15" />清理</button>
       </div>
+
+      <button v-if="props.localAccount" type="button" class="setting-row setting-link" @click="emit('account')">
+        <span class="setting-link-label">
+          <span class="account-setting-icon">@</span>
+          <span>
+            <strong>账号管理</strong>
+            <p>{{ props.username || "本地账号" }}</p>
+          </span>
+        </span>
+        <ChevronRight :size="19" />
+      </button>
 
       <button ref="aboutButton" type="button" class="setting-row setting-link" @click="requestAbout">
         <span class="setting-link-label">
