@@ -2,6 +2,8 @@
 
 Docker 使用 `AUTH_MODE=local` 和独立 SQLite 账号体系，直接暴露根路径 `/`；fnOS `.fpk` 仍使用 Unix Socket 和 fnOS 网关账号，不共享 Docker 会话。
 
+默认镜像名为 `timorm/fnos-app-schulte`，与代码仓库、Docker 容器/数据卷和 fnOS 应用标识保持一致。需要使用镜像代理或自定义镜像时，可通过 `DOCKERHUB_IMAGE` 覆盖。
+
 ```bash
 docker compose pull
 docker compose up -d

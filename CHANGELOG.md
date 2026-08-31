@@ -2,6 +2,14 @@
 
 本项目遵循语义化版本。
 
+## 1.0.7
+
+- Reorganize README deployment, development, verification, and documentation entry points.
+- Keep the Docker image name aligned with the existing repository and fnOS package identity.
+
+## Unreleased
+
+
 ## 1.0.6
 
 ### Added

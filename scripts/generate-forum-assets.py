@@ -90,7 +90,7 @@ def make_cover() -> None:
         x += width + 18
 
     draw.text((116, 680), "第三方开源 fnOS Native 应用", font=font(30), fill=MUTED)
-    draw.text((116, 734), "v1.0.6", font=font(26, True), fill=GREEN)
+    draw.text((116, 734), "v1.0.7", font=font(26, True), fill=GREEN)
 
     phone_card(canvas, SNAPSHOTS / "home.png", (1020, 86), (394, 700))
     phone_card(canvas, SNAPSHOTS / "game-hex.png", (825, 188), (330, 714))
